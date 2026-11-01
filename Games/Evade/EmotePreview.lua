@@ -33,6 +33,7 @@ local POSE_VERSION = 1
 
 local alive = true
 local hostGui = nil
+local guiBroken = false    -- true kalau executor ini tidak punya tempat yang bisa dipakai untuk host (lihat EnsureGui)
 local hosts = {}          -- { Frame, InUse }: ViewportFrame tersembunyi
 local cache = {}          -- [modul item] = model diam hasil render
 local inflight = {}       -- [modul item] = true selama model sedang dibangun
@@ -67,6 +68,7 @@ local function MannequinTemplate(r15)
 end
 
 function Preview.Available(kind)
+    if guiBroken then return false end
     local r15 = IsR15()
     if kind == "Carry" then return MannequinTemplate(r15) ~= nil end
     return RigTemplate(r15) ~= nil
@@ -159,19 +161,54 @@ end
 -- Host tersembunyi (hanya dipakai saat animasi benar-benar dimainkan)
 -- ------------------------------------------
 -- ViewportFrame kecil hampir tidak terlihat; namanya berawalan "Mugiwara" supaya Hide GUI tidak menyentuhnya.
+-- Tempat pasang host: dicoba satu per satu dengan benar-benar memasang sebuah Folder uji. gethui() di sebagian
+-- executor (mis. Xeno) tidak selalu mengembalikan Instance yang bisa dipakai; memasang ke nilai seperti itu
+-- melempar "Unable to cast value to Object".
+local function CanParentTo(container)
+    if typeof(container) ~= "Instance" then return false end
+    return (pcall(function()
+        local probe = Instance.new("Folder")
+        probe.Parent = container
+        probe:Destroy()
+    end))
+end
+
+local function PickGuiParent()
+    local candidates = {
+        function() return gethui and gethui() end,
+        function() return game:GetService("CoreGui") end,
+        function() return Players.LocalPlayer:FindFirstChildOfClass("PlayerGui") end,
+    }
+    for _, candidate in ipairs(candidates) do
+        local ok, container = pcall(candidate)
+        if ok and CanParentTo(container) then return container end
+    end
+    return nil
+end
+
+-- Mengembalikan ScreenGui host, atau nil (dan Available jadi false) kalau tidak ada tempat yang bisa dipakai.
 local function EnsureGui()
     if hostGui and hostGui.Parent then return hostGui end
 
-    local parent
-    pcall(function() parent = (gethui and gethui()) or game:GetService("CoreGui") end)
-    if not parent then parent = Players.LocalPlayer:WaitForChild("PlayerGui") end
+    local parent = PickGuiParent()
+    if not parent then
+        guiBroken = true
+        return nil
+    end
 
-    hostGui = Instance.new("ScreenGui")
-    hostGui.Name = "MugiwaraEmotePreview"
-    hostGui.ResetOnSpawn = false
-    hostGui.DisplayOrder = -10
-    hostGui.IgnoreGuiInset = true
-    hostGui.Parent = parent
+    local gui = Instance.new("ScreenGui")
+    gui.Name = "MugiwaraEmotePreview"
+    gui.ResetOnSpawn = false
+    gui.DisplayOrder = -10
+    gui.IgnoreGuiInset = true
+    local ok = pcall(function() gui.Parent = parent end)
+    if not ok then
+        pcall(function() gui:Destroy() end)
+        guiBroken = true
+        return nil
+    end
+
+    hostGui = gui
     table.clear(hosts)
     return hostGui
 end
@@ -180,6 +217,7 @@ end
 local function AcquireHost()
     while alive do
         local gui = EnsureGui()
+        if not gui then return nil, "this executor has no safe place to render previews" end
         for _, entry in ipairs(hosts) do
             if not entry.InUse and entry.Frame.Parent then
                 entry.InUse = true
@@ -560,10 +598,10 @@ local function EnsurePose(job)
     if store[key] then return store[key] end
     inflightPose[key] = true
 
-    local hostEntry = AcquireHost()
+    local hostEntry, hostFailure = AcquireHost()
     if not hostEntry then
         inflightPose[key] = nil
-        return nil, "unloaded"
+        return nil, hostFailure or "unloaded"
     end
 
     local pose, failure
@@ -642,6 +680,8 @@ end
 
 -- Memuat animasi item yang posenya belum ada, serentak, di latar belakang (mempercepat pengambilan pose).
 function Preview.Preload(entries, kind)
+    -- Tanpa tempat render yang aman pratinjau tidak dipakai, jadi animasinya juga tidak perlu dimuat.
+    if not EnsureGui() then return end
     local r15 = IsR15()
     local store = LoadPoses()
     local list = {}
@@ -712,7 +752,7 @@ function Preview.Collect(entries, kind)
     local store = LoadPoses()
     local collected = 0
     for _, entry in ipairs(entries) do
-        if not alive then break end
+        if not alive or guiBroken then break end
         for _, job in ipairs(PoseJobs(entry, kind, r15)) do
             if not store[PoseKey(job)] then
                 if EnsurePose(job) then collected = collected + 1 end
