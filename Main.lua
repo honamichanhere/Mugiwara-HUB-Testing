@@ -483,7 +483,14 @@ if type(buildMisc) == "function" then
     if not ok then warn("[Mugiwara HUB] Misc tab error: " .. tostring(err)) end
 end
 
--- Chat tepat di bawah Misc; UI Config (tab section Appearance) paling bawah.
+-- Tools tepat di bawah Misc.
+local buildTools = getgenv().MugiwaraImport("Tabs/ToolsTab.lua")
+if type(buildTools) == "function" then
+    local ok, err = pcall(buildTools, Window, isPremiumUser, MugiwaraUI)
+    if not ok then warn("[Mugiwara HUB] Tools tab error: " .. tostring(err)) end
+end
+
+-- Chat tepat di bawah Tools; UI Config (tab section Appearance) paling bawah.
 local buildChat = getgenv().MugiwaraImport("Tabs/ChatTab.lua")
 if type(buildChat) == "function" then
     local ok, err = pcall(buildChat, Window, isPremiumUser, MugiwaraUI, CHAT_URL)
