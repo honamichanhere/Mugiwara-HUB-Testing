@@ -6,4 +6,4 @@
 -- data tiap carry, jadi namanya tidak ikut tertukar. Modul ini tanpa UI; antarmukanya VisualCarryUI.lua.
 local VisualSwap = getgenv().MugiwaraImport("Games/Evade/VisualSwap.lua")
 
-return VisualSwap({ Category = "CarryAnimations", Noun = "carry" })
+return VisualSwap({ Category = "CarryAnimations", Noun = "carry", AllHeader = "All Carry" })

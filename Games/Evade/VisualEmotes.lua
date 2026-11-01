@@ -307,7 +307,7 @@ local WHITELIST = {
     ClassicDance = "ZombieStride",
 }
 
-local VisualEmotes = VisualSwap({ Category = "Emotes", Paths = PATHS, Whitelist = WHITELIST, Noun = "emote" })
+local VisualEmotes = VisualSwap({ Category = "Emotes", Paths = PATHS, Whitelist = WHITELIST, Noun = "emote", AllHeader = "All Emotes" })
 
 -- Nama lama yang dipakai UI Visual Emotes.
 VisualEmotes.GetEmotes = VisualEmotes.GetEntries

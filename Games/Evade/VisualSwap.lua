@@ -15,6 +15,8 @@ return function(config)
     local PATHS = config.Paths or {}
     local WHITELIST = config.Whitelist or {}
     local NOUN = config.Noun or "item"
+    -- Kelompok untuk item yang kategorinya tidak terbaca (executor yang tidak boleh membaca modul game).
+    local ALL_HEADER = config.AllHeader or "All"
 
     local entries = {}        -- { { Name, Display, Header, Id, Instance } } terurut menurut nama tampilan
     local byInstance = {}     -- [instance] = entry
@@ -43,7 +45,7 @@ return function(config)
     local loaded = false
     local source = "none"
 
-    -- Modul item game dibaca lewat ModuleGuard (di Xeno tidak dibaca sama sekali: kategori jadi "Other").
+    -- Modul item game dibaca lewat ModuleGuard (di Xeno tidak dibaca sama sekali: semua item masuk satu kelompok, AllHeader).
     local SafeRequire = ModuleGuard.Require
 
     -- Nama tampilan dan Header (kelompok di menu game: "Normal", "Halloween", ...) dibaca dari modul data item.
@@ -59,7 +61,7 @@ return function(config)
         local entry = {
             Name = instance.Name,
             Display = type(display) == "string" and display or SpacedName(instance.Name),
-            Header = type(header) == "string" and header or "Other",
+            Header = type(header) == "string" and header or ALL_HEADER,
             Id = id,
             Instance = instance,
         }
