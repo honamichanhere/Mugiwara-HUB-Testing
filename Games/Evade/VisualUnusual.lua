@@ -66,10 +66,10 @@ local function AddEntry(module, id, info)
 
     local entry = {
         Name = module.Name,
-        Display = type(appearance.Name) == "string" and appearance.Name or module.Name,
-        Header = type(ui.Header) == "string" and ui.Header or "Other",
+        Display = type(appearance.Name) == "string" and appearance.Name or (module.Name:gsub("(%l)(%u)", "%1 %2")),
+        Header = type(ui.Header) == "string" and ui.Header or (ModuleGuard.Restricted and "All Unusual" or "Other"),
         Rarity = type(ui.Rarity) == "string" and ui.Rarity or nil,
-        Image = (type(icon) == "number" and icon ~= 0) and ("rbxassetid://" .. icon) or nil,
+        Image = (not ModuleGuard.Restricted and type(icon) == "number" and icon ~= 0) and ("rbxassetid://" .. icon) or nil,
         Id = id,
         Instance = module,
         Limbs = limbs,
@@ -84,6 +84,8 @@ local function IsUnusual(info)
 end
 
 local function LoadFromRegistry()
+    -- Registry milik game me-require semua item: tidak disentuh di executor yang dibatasi (dipakai scan).
+    if ModuleGuard.Restricted then return false end
     local items = ReplicatedStorage:FindFirstChild("Items")
     local registryModule = items and items:FindFirstChild("Registry")
     if not registryModule then return false end
@@ -110,8 +112,19 @@ local function LoadFromScan()
     if not items then return end
     for _, descendant in ipairs(items:GetDescendants()) do
         if descendant:IsA("ModuleScript") and (descendant:FindFirstChild("Character") or descendant:FindFirstChild("CharacterClassic")) then
-            local ok, info = ModuleGuard.Require(descendant)
-            if ok and IsUnusual(info) then AddEntry(descendant, descendant:GetAttribute("ID"), info) end
+            if ModuleGuard.Restricted then
+                -- Modul tidak boleh dibaca, jadi "Unusual atau bukan" tidak bisa dicek: semua kosmetik ber-model
+                -- Character di folder bernama "Cosmetics" dimasukkan, dalam satu grup tanpa ikon.
+                local parent, inCosmetics = descendant.Parent, false
+                while parent and parent ~= items do
+                    if parent.Name == "Cosmetics" then inCosmetics = true break end
+                    parent = parent.Parent
+                end
+                if inCosmetics then AddEntry(descendant, descendant:GetAttribute("ID"), {}) end
+            else
+                local ok, info = ModuleGuard.Require(descendant)
+                if ok and IsUnusual(info) then AddEntry(descendant, descendant:GetAttribute("ID"), info) end
+            end
         end
     end
 end

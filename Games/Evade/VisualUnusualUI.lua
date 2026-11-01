@@ -3,7 +3,8 @@ local VisualUnusual = getgenv().MugiwaraImport("Games/Evade/VisualUnusual.lua")
 -- Antarmuka Visual Unusual (premium): pilih efek Unusual dari grid. Memilih = langsung dipasang, memilih lagi =
 -- dilepas, dan beberapa bisa dipasang bersamaan (ditumpuk). Logikanya ada di VisualUnusual.lua.
 -- Gambar tiap kotak adalah ikon Unusual dari game, jadi tidak ada viewport (ringan). Daftar dibagi per kategori
--- (Header milik game), satu kategori satu daftar utuh, sama seperti Visual Emotes.
+-- (Header milik game), satu kategori satu daftar utuh, sama seperti Visual Emotes. Di executor yang dibatasi (Xeno)
+-- modul game tidak dibaca: satu grup "All Unusual", tanpa ikon.
 local UI = {}
 
 local HEADER_ORDER = { "Normal", "Gamepasses", "Halloween", "Winter Holidays", "Summer", "Spring", "Valentines", "Event", "Special" }
@@ -45,15 +46,6 @@ function UI.Build(Section, isPremiumUser, MugiwaraUI)
 
     local function Notify(title, content, duration)
         MugiwaraUI:Notify({ Title = title, Content = content, Duration = duration or 3 })
-    end
-
-    if VisualUnusual.Restricted then
-        Section:Paragraph({
-            Title = "Visual Unusual Unavailable",
-            Desc = "This executor cannot read the game's item data without breaking character loading, so Visual Unusual is turned off here.",
-            Icon = "lucide:triangle-alert"
-        })
-        return
     end
 
     if VisualUnusual.Load() == 0 then
