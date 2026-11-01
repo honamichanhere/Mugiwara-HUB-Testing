@@ -173,5 +173,10 @@ return function(Window, isPremiumUser, MugiwaraUI)
         injectMovement(TabMain, isPremiumUser, MugiwaraUI)
     end
 
+    local injectEsp = getgenv().MugiwaraImport("Tabs/EspInjector.lua")
+    if injectEsp then
+        injectEsp(TabMain, isPremiumUser, MugiwaraUI)
+    end
+
     pcall(function() Window:SelectTab(2) end)
 end
