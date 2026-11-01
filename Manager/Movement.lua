@@ -55,6 +55,43 @@ function Movement.RestoreJump()
     end
 end
 
+-- Posisi karakter sekarang (Vector3) atau nil kalau belum ada karakter.
+function Movement.GetPosition()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    return root and root.Position or nil
+end
+
+-- "x, y, z" -> Vector3. Menerima koma/spasi/kurung, mis. "10 5 -3" atau "Vector3.new(10, 5, -3)".
+function Movement.ParsePosition(text)
+    local numbers = {}
+    -- Buang kata (mis. "Vector3.new") dulu supaya angka di dalam namanya tidak terhitung.
+    local cleaned = string.gsub(tostring(text or ""), "[%a_]+%d*", " ")
+    for token in string.gmatch(cleaned, "[-+]?%d*%.?%d+") do
+        table.insert(numbers, tonumber(token))
+    end
+    if #numbers ~= 3 then return nil end
+    return Vector3.new(numbers[1], numbers[2], numbers[3])
+end
+
+-- Format yang sama dengan yang dibaca ParsePosition, jadi hasil salin bisa ditempel lagi untuk teleport.
+function Movement.FormatPosition(position)
+    return string.format("%.2f, %.2f, %.2f", position.X, position.Y, position.Z)
+end
+
+-- Memindahkan karakter ke `position` dengan arah hadap tetap. Mengembalikan berhasil, pesan.
+function Movement.TeleportTo(position)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false, "Your character is not ready yet." end
+
+    local rotation = root.CFrame - root.CFrame.Position
+    char:PivotTo(CFrame.new(position) * rotation)
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+    return true, "Teleported to " .. Movement.FormatPosition(position)
+end
+
 local function DestroyFlyObjects()
     if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity = nil end
     if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end

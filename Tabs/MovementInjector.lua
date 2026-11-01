@@ -29,6 +29,43 @@ return function(TargetTab, isPremiumUser, MugiwaraUI)
     MovementSection:Divider({ Title = "Collision" })
     local ToggleNoclip = MovementSection:Toggle({ Title = "Enable Noclip", Icon = "lucide:ghost", Desc = Risk.Desc("Noclip"), Callback = function(Value) Risk.Warn(MugiwaraUI, "Noclip", Value); MovementModule.NoclipEnabled = Value end })
 
+    MovementSection:Divider({ Title = "Teleport" })
+    local teleportText = ""
+    MovementSection:Input({ Title = "Coordinates", Icon = "lucide:map-pin", Desc = "X, Y, Z of where to go, for example 120.5, 40, -300. Paste a copied position here.", Placeholder = "X, Y, Z", Callback = function(Text) teleportText = Text end })
+    MovementSection:Button({
+        Title = "Teleport to Coordinates",
+        Icon = "lucide:navigation",
+        Desc = Risk.Desc("Teleport", "Moves your character to the coordinates above. Teleporting far is easily flagged by the server."),
+        Callback = function()
+            local position = MovementModule.ParsePosition(teleportText)
+            if not position then
+                MugiwaraUI:Notify({ Title = "Teleport", Content = "Enter three numbers: X, Y, Z.", Duration = 3 })
+                return
+            end
+            Risk.Warn(MugiwaraUI, "Teleport", true)
+            local ok, message = MovementModule.TeleportTo(position)
+            MugiwaraUI:Notify({ Title = ok and "Teleport" or "Teleport Failed", Content = message, Duration = 3 })
+        end
+    })
+    MovementSection:Button({
+        Title = "Copy My Position",
+        Icon = "lucide:clipboard-copy",
+        Desc = "Copies your current X, Y, Z to the clipboard.",
+        Callback = function()
+            local position = MovementModule.GetPosition()
+            if not position then
+                MugiwaraUI:Notify({ Title = "Copy Position", Content = "Your character is not ready yet.", Duration = 3 })
+                return
+            end
+            local text = MovementModule.FormatPosition(position)
+            if type(setclipboard) ~= "function" or not pcall(setclipboard, text) then
+                MugiwaraUI:Notify({ Title = "Copy Position", Content = "Your executor cannot copy to the clipboard.", Duration = 3 })
+                return
+            end
+            MugiwaraUI:Notify({ Title = "Position Copied", Content = text, Duration = 2 })
+        end
+    })
+
     MovementSection:Divider({ Title = "Animation Controls" })
     MovementSection:Input({ Title = "Animation Speed", Icon = "lucide:timer", Desc = "Speed multiplier for all your playing animations, kept on every frame. Enter 1 to reset, 0 to freeze.", Placeholder = "Number", Callback = function(Text) local num = tonumber(Text) if num then MovementModule.SetAnimSpeed(num) end end })
 
