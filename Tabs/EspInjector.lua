@@ -1,6 +1,101 @@
 local ESP = getgenv().MugiwaraImport("Manager/ESP.lua")
+local PlayerPath = getgenv().MugiwaraImport("Manager/PlayerPath.lua")
 
--- Section "ESP" di tab Main (dipakai Universal.lua dan modul game, seperti MovementInjector).
+-- Section "Player Path": jalur berjalan ke pemain pilihan.
+local function BuildPlayerPath(TargetTab, MugiwaraUI)
+    if not PlayerPath then
+        TargetTab:Paragraph({
+            Title = "Player Path Unavailable",
+            Icon = "lucide:triangle-alert",
+            Desc = "The Player Path module failed to load. Re-execute the hub to try again."
+        })
+        return
+    end
+
+    local Settings = PlayerPath.Settings
+    local PathSection = TargetTab:Section({ Title = "Player Path", Icon = "lucide:route", Opened = false, Box = true })
+
+    -- Hanya memberi tahu saat jalur tidak ada / berubah, bukan tiap hitung ulang.
+    PlayerPath.OnStatus = function(text)
+        if text then MugiwaraUI:Notify({ Title = "Player Path", Content = text, Duration = 3 }) end
+    end
+
+    local TargetDropdown
+    TargetDropdown = PathSection:Dropdown({
+        Title = "Target Player",
+        Icon = "lucide:user-search",
+        Desc = "Pick the player to draw a walking route to.",
+        Multi = false,
+        Values = PlayerPath.GetPlayerList(),
+        Callback = function(Value)
+            -- Callback juga terpanggil saat UI dibuat (nilai kosong): diabaikan.
+            if type(Value) ~= "string" or Value == "" then return end
+            local ok, message = PlayerPath.SetTarget(Value)
+            MugiwaraUI:Notify({ Title = ok and "Player Path" or "Player Path Failed", Content = message, Duration = 2 })
+        end
+    })
+
+    PathSection:Button({
+        Title = "Refresh Player List",
+        Icon = "lucide:refresh-cw",
+        Callback = function()
+            if TargetDropdown and TargetDropdown.Refresh then
+                TargetDropdown:Refresh(PlayerPath.GetPlayerList())
+                MugiwaraUI:Notify({ Title = "List Updated", Content = "The player list has been refreshed.", Duration = 2 })
+            end
+        end
+    })
+
+    PathSection:Toggle({
+        Title = "Show Path",
+        Icon = "lucide:map-pin",
+        Desc = "Draws a route along the floor to the target. It follows walkable ground only and never cuts through walls.",
+        Value = false,
+        Callback = function(Value) PlayerPath.SetEnabled(Value) end
+    })
+
+    PathSection:Colorpicker({
+        Title = "Path Color",
+        Icon = "lucide:palette",
+        Default = Settings.Color,
+        Callback = function(Color)
+            Settings.Color = Color
+            PlayerPath.Refresh()
+        end
+    })
+
+    PathSection:Slider({
+        Title = "Line Thickness",
+        Icon = "lucide:minus",
+        Step = 0.1,
+        Value = { Min = 0.1, Max = 1.5, Default = Settings.Thickness },
+        Callback = function(Value)
+            Settings.Thickness = Value
+            PlayerPath.Refresh()
+        end
+    })
+
+    PathSection:Toggle({
+        Title = "Line Through Walls",
+        Icon = "lucide:brick-wall",
+        Desc = "Keep the line visible behind walls so you can follow it around corners. The route itself always avoids walls.",
+        Value = Settings.ThroughWalls,
+        Callback = function(Value)
+            Settings.ThroughWalls = Value
+            PlayerPath.Refresh()
+        end
+    })
+
+    PathSection:Toggle({
+        Title = "Allow Jumps",
+        Icon = "lucide:chevrons-up",
+        Desc = "Let the route include jumps over gaps and obstacles.",
+        Value = Settings.AllowJump,
+        Callback = function(Value) Settings.AllowJump = Value end
+    })
+end
+
+-- Section "ESP" dan "Player Path" di tab Main (dipakai Universal.lua dan modul game, seperti MovementInjector).
 return function(TargetTab, isPremiumUser, MugiwaraUI)
     if not ESP then
         TargetTab:Paragraph({
@@ -8,6 +103,7 @@ return function(TargetTab, isPremiumUser, MugiwaraUI)
             Icon = "lucide:triangle-alert",
             Desc = "The ESP module failed to load. Re-execute the hub to try again."
         })
+        BuildPlayerPath(TargetTab, MugiwaraUI)
         return
     end
 
@@ -100,4 +196,6 @@ return function(TargetTab, isPremiumUser, MugiwaraUI)
             ESP.Refresh()
         end
     })
+
+    BuildPlayerPath(TargetTab, MugiwaraUI)
 end
