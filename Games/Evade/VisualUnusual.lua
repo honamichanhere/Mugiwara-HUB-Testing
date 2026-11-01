@@ -20,6 +20,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local LocalPlayer = Players.LocalPlayer
 local Rigs = getgenv().MugiwaraImport("Games/Evade/Rigs.lua")
+local ModuleGuard = getgenv().MugiwaraImport("Games/Evade/ModuleGuard.lua")
 
 local Unusual = {}
 
@@ -87,7 +88,7 @@ local function LoadFromRegistry()
     local registryModule = items and items:FindFirstChild("Registry")
     if not registryModule then return false end
 
-    local ok, Registry = pcall(require, registryModule)
+    local ok, Registry = ModuleGuard.Require(registryModule)
     if not ok or type(Registry) ~= "table" or type(Registry.GetByCategory) ~= "function" then return false end
 
     local okList, list = pcall(Registry.GetByCategory, "Cosmetics")
@@ -96,7 +97,7 @@ local function LoadFromRegistry()
     for id, record in pairs(list) do
         local module = type(record) == "table" and record.Module
         if typeof(module) == "Instance" then
-            local okInfo, info = pcall(require, module)
+            local okInfo, info = ModuleGuard.Require(module)
             if okInfo and IsUnusual(info) then AddEntry(module, id, info) end
         end
     end
@@ -109,7 +110,7 @@ local function LoadFromScan()
     if not items then return end
     for _, descendant in ipairs(items:GetDescendants()) do
         if descendant:IsA("ModuleScript") and (descendant:FindFirstChild("Character") or descendant:FindFirstChild("CharacterClassic")) then
-            local ok, info = pcall(require, descendant)
+            local ok, info = ModuleGuard.Require(descendant)
             if ok and IsUnusual(info) then AddEntry(descendant, descendant:GetAttribute("ID"), info) end
         end
     end
@@ -140,6 +141,7 @@ function Unusual.Load()
 end
 
 function Unusual.GetSource() return source end
+Unusual.Restricted = ModuleGuard.Restricted
 function Unusual.GetEntries() return entries end
 
 --// memori -----------------------------------------------------------------------

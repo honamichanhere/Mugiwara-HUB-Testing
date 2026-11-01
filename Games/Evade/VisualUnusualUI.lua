@@ -47,6 +47,15 @@ function UI.Build(Section, isPremiumUser, MugiwaraUI)
         MugiwaraUI:Notify({ Title = title, Content = content, Duration = duration or 3 })
     end
 
+    if VisualUnusual.Restricted then
+        Section:Paragraph({
+            Title = "Visual Unusual Unavailable",
+            Desc = "This executor cannot read the game's item data without breaking character loading, so Visual Unusual is turned off here.",
+            Icon = "lucide:triangle-alert"
+        })
+        return
+    end
+
     if VisualUnusual.Load() == 0 then
         Section:Paragraph({
             Title = "Visual Unusual Unavailable",

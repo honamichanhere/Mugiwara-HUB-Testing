@@ -4,6 +4,8 @@
 -- tanpa UI; dipakai lewat pabrik di bawah, satu instance per jenis item:
 --   VisualSwap({ Category = "Emotes", Paths = {...}, Whitelist = {...}, Noun = "emote" })
 --   VisualSwap({ Category = "CarryAnimations", Noun = "carry" })
+local ModuleGuard = getgenv().MugiwaraImport("Games/Evade/ModuleGuard.lua")
+
 return function(config)
     local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -41,34 +43,8 @@ return function(config)
     local loaded = false
     local source = "none"
 
-    -- require() pada modul item yang BELUM dimuat game menjalankannya dari thread executor. Di executor tertentu
-    -- (Xeno) modul itu gagal dimuat, dan Roblox menyimpan kegagalannya: sesudah itu game sendiri tidak bisa
-    -- memuat modul yang sama ("Requested module experienced an error while loading"), karakter tidak jadi
-    -- dimuat dan avatar hilang. Di executor seperti itu hanya modul yang sudah dimuat game yang di-require
-    -- (hasilnya cache, tidak ada yang dijalankan ulang); sisanya dibiarkan tanpa data modul (kategori "Other").
-    local RESTRICTED = false
-    pcall(function()
-        local name = identifyexecutor and identifyexecutor()
-        RESTRICTED = type(name) == "string" and string.find(string.lower(name), "xeno", 1, true) ~= nil
-    end)
-
-    local loadedSet, loadedAt = nil, 0
-    local function IsLoaded(module)
-        if type(getloadedmodules) ~= "function" then return false end
-        if not loadedSet or os.clock() - loadedAt > 5 then
-            loadedSet, loadedAt = {}, os.clock()
-            local ok, list = pcall(getloadedmodules)
-            if ok and type(list) == "table" then
-                for _, loadedModule in ipairs(list) do loadedSet[loadedModule] = true end
-            end
-        end
-        return loadedSet[module] == true
-    end
-
-    local function SafeRequire(module)
-        if RESTRICTED and not IsLoaded(module) then return false, "module not loaded by the game yet" end
-        return pcall(require, module)
-    end
+    -- Modul item game dibaca lewat ModuleGuard (di Xeno tidak dibaca sama sekali: kategori jadi "Other").
+    local SafeRequire = ModuleGuard.Require
 
     -- Nama tampilan dan Header (kelompok di menu game: "Normal", "Halloween", ...) dibaca dari modul data item.
     local function AddEntry(instance, id)

@@ -20,6 +20,8 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
+local ModuleGuard = getgenv().MugiwaraImport("Games/Evade/ModuleGuard.lua")
+
 local Preview = {}
 
 local TRACK_TIMEOUT = 5   -- detik menunggu animasi dimuat (sama seperti game: maksimal 5)
@@ -68,7 +70,8 @@ local function MannequinTemplate(r15)
 end
 
 function Preview.Available(kind)
-    if guiBroken then return false end
+    -- Xeno: LoadAnimation pada rig pratinjau selalu gagal ("Unable to cast value to Object"), jadi grid memakai ikon.
+    if guiBroken or ModuleGuard.Restricted then return false end
     local r15 = IsR15()
     if kind == "Carry" then return MannequinTemplate(r15) ~= nil end
     return RigTemplate(r15) ~= nil
