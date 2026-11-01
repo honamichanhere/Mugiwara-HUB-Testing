@@ -7,8 +7,7 @@ reasoning; this file is just the how-to.
 ## Checklist, every time you publish a release
 
 1. `node release/build.mjs --repo=<owner>/<release-repo-name> --obfuscate`
-   **`--repo` is not optional** if your release repo's name is anything other than
-   `honamichanhere/Mugiwara-HUB`. `Main.lua`'s own `BASE_URL` (which it uses to fetch `Core.lua`
+   The default `--repo` is `honamichanhere/MugiwaraHub` (the client repo); pass `--repo` only if the release repo is named differently. `Main.lua`'s own `BASE_URL` (which it uses to fetch `Core.lua`
    and the game bundles, and to reload/queue itself) is hardcoded in the source to that name;
    leaving `--repo` out means `Main.lua` loads fine from wherever you actually put it, but then
    404s trying to fetch everything else from the wrong repo. (This bit the first real release —

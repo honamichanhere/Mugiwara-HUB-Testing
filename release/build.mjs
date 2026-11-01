@@ -80,13 +80,13 @@ const LUAU_TARGET = flag("no-luau") ? false : true; // --no-luau to target plain
 
 // Main.lua fetches its own other files (Core.lua, a game bundle, and itself again on reload/
 // teleport) from BASE_URL, which is hardcoded in Main.lua's source as
-// "https://raw.githubusercontent.com/honamichanhere/Mugiwara-HUB/<branch>/". That only works
+// "https://raw.githubusercontent.com/honamichanhere/Mugiwara-HUB-Testing/<branch>/". That only works
 // when you host the release at that exact repo. Point it at wherever you actually upload the
 // release build with --repo=<owner>/<repo-name> — if you forget this, Main.lua loads fine (it's
 // the first file fetched, from whatever URL you used yourself) but then fails to find Core.lua/
 // the game bundle, because it goes looking for them back at the OLD repo instead of the one you
 // put them in.
-const REPO = flag("repo") || "honamichanhere/Mugiwara-HUB";
+const REPO = flag("repo") || "honamichanhere/MugiwaraHub";
 
 // ---------- 1. discover every module file on disk ----------
 // Scanned by folder, not by grepping MugiwaraImport("...") calls: a few call sites pass a
@@ -289,8 +289,7 @@ env.MugiwaraImport = function(path)
 end`;
 }
 
-const OLD_BASE_URL_LINE = `local REPO = env.MugiwaraRepo or "honamichanhere/Mugiwara-HUB"
-local BASE_URL = "https://raw.githubusercontent.com/" .. REPO .. "/" .. BRANCH .. "/"`;
+const OLD_BASE_URL_LINE = `local BASE_URL = "https://raw.githubusercontent.com/honamichanhere/Mugiwara-HUB-Testing/" .. BRANCH .. "/"`;
 
 function patchMainLua() {
 	let source = readFileSync(join(ROOT, "Main.lua"), "utf8").replace(/\r\n/g, "\n");
