@@ -6,7 +6,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
 -- Command VIP dikirim persis seperti tombol ACTIVATE di menu VIP:
---     ReplicatedStorage.Events.Admin.VIPCommand:FireServer("!timer 1")
+--     ReplicatedStorage.Remotes.Admin.VIPCommand:FireServer("!timer 1")
 -- yaitu "!" + CommandNames[1] + argumen dipisah spasi. Server tetap yang memvalidasi
 -- (atribut VIPCommandsAccess, daftar command VIPMenuAccessible), jadi modul ini hanya
 -- bisa menjalankan apa yang memang boleh dilakukan pemilik server lewat menu VIP.
@@ -270,8 +270,8 @@ local function NormalizeArgs(entry, args)
 end
 
 function VIPCommands.GetRemote()
-    local events = ReplicatedStorage:FindFirstChild("Events")
-    local admin = events and events:FindFirstChild("Admin")
+    local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+    local admin = remotes and remotes:FindFirstChild("Admin")
     return admin and admin:FindFirstChild("VIPCommand")
 end
 

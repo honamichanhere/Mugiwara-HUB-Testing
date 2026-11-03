@@ -208,7 +208,7 @@ table.insert(connections, LocalPlayer.CharacterAdded:Connect(function(character)
 end))
 if LocalPlayer.Character then task.spawn(WatchCharacter, LocalPlayer.Character) end
 
--- Fase ronde Evade: ReplicatedStorage.Events.UpdateServerStateRegistry mengirim ("RoundStatus", n)
+-- Fase ronde Evade: ReplicatedStorage.Remotes.Registry.UpdateServerStateRegistry mengirim ("RoundStatus", n)
 --   0 = tidak ada ronde (menunggu pemain / ronde selesai), 1 = intermission, 2 = ronde berjalan.
 -- Pemicu hanya jalan saat status BERUBAH. Nilai pertama yang diterima cuma jadi acuan (mis.
 -- sinkronisasi saat baru join), supaya masuk server di tengah fase tidak langsung memicu event.
@@ -243,8 +243,9 @@ end
 
 task.spawn(function()
     local ok, remote = pcall(function()
-        local events = game:GetService("ReplicatedStorage"):WaitForChild("Events", 10)
-        return events:WaitForChild("UpdateServerStateRegistry", 10)
+        local remotes = game:GetService("ReplicatedStorage"):WaitForChild("Remotes", 10)
+        local registry = remotes:WaitForChild("Registry", 10)
+        return registry:WaitForChild("UpdateServerStateRegistry", 10)
     end)
     if not ok or not remote or not alive then return end
 
