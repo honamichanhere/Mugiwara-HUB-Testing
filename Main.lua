@@ -213,17 +213,43 @@ LoaderProgress(14, 23)
 
 -- Premium status comes ONLY from the isPremium flag returned by the Panda Auth server,
 -- never from the shape of the key string.
+-- Menurut docs PUSL-V4 hanya reason INVALID_KEY yang berarti key-nya salah; reason lain (IDENTITY,
+-- PROTOCOL, NETWORK, RATE_LIMITED, ...) bersifat sementara, jadi dicoba ulang dengan jeda dan
+-- ditandai offline supaya key tersimpan tidak dihapus.
+local VALIDATE_ATTEMPTS = 3
+local TRANSIENT_MESSAGES = {
+    IDENTITY = "Could not verify the auth server from this device. Check your date/time and VPN, then try again.",
+    PROTOCOL = "Auth server protocol error. Please try again in a moment.",
+    NETWORK = "Could not reach the auth server.",
+    RATE_LIMITED = "Too many attempts. Please wait a moment and try again.",
+}
+
 local function ValidateKey(inputKey)
     inputKey = tostring(inputKey or ""):match("^%s*(.-)%s*$")
     if inputKey == "" or #inputKey > MAX_KEY_LENGTH then
         return false, false, { message = "Invalid key format." }
     end
 
-    local ok, result = pcall(PUSL.validate, inputKey)
-    if not ok or type(result) ~= "table" then
-        return false, false, { message = "Could not reach the auth server.", offline = true }
+    local result
+    for attempt = 1, VALIDATE_ATTEMPTS do
+        local ok, response = pcall(PUSL.validate, inputKey)
+        if ok and type(response) == "table" then
+            if response.success == true or response.reason == "INVALID_KEY" then
+                return response.success == true, response.isPremium == true, response
+            end
+            result = response
+        else
+            result = { reason = "NETWORK" }
+        end
+        if attempt < VALIDATE_ATTEMPTS then task.wait(attempt * 2) end
     end
-    return result.success == true, result.isPremium == true, result
+
+    warn("[Mugiwara HUB] Panda Auth unavailable: " .. tostring(result.reason))
+    return false, false, {
+        message = TRANSIENT_MESSAGES[result.reason] or result.message or "Auth server unavailable. Please try again.",
+        reason = result.reason,
+        offline = true,
+    }
 end
 
 if readfile and isfile and isfile(savedKeyPath) then
