@@ -53,7 +53,7 @@ local generation = 0        -- naik tiap target / on-off berubah, supaya hitunga
 local lastStatus = nil
 local pathLength = nil
 local connection
-local folder, anchor
+local folder
 local beams, attachments = {}, {} -- Beam dan Attachment yang dipakai ulang (rantai: beam i = titik i ke titik i+1)
 local lastStart, lastEnd, lastTime, lastFailed = nil, nil, 0, false
 
@@ -67,19 +67,9 @@ local function EnsureFolder()
     folder = Instance.new("Folder")
     folder.Name = "MugiwaraPlayerPath"
 
-    -- Attachment butuh Part sebagai induk; satu Part tak terlihat di titik 0 jadi tempat semuanya.
-    anchor = Instance.new("Part")
-    anchor.Name = "Anchor"
-    anchor.Anchored = true
-    anchor.CanCollide, anchor.CanQuery, anchor.CanTouch = false, false, false
-    anchor.Transparency = 1
-    anchor.Size = Vector3.new(0.1, 0.1, 0.1)
-    anchor.CFrame = CFrame.new()
-    anchor.Parent = folder
-
+    -- Beam-nya ada di folder ini; Attachment-nya ditaruh di Terrain (induk standar untuk Attachment tanpa Part).
     folder.Parent = camera
     table.clear(beams)
-    table.clear(attachments)
     return true
 end
 
@@ -87,9 +77,9 @@ local function StyleBeam(beam)
     local settings = PlayerPath.Settings
     beam.Color = ColorSequence.new(settings.Color)
     beam.Width0, beam.Width1 = settings.Thickness, settings.Thickness
-    -- Beam selalu diuji kedalamannya; ZOffset besar menggesernya ke depan kamera supaya tetap terlihat
-    -- di balik tembok (hanya tampilan, jalurnya sendiri tetap lewat jalan yang benar).
-    beam.ZOffset = settings.ThroughWalls and 1000 or 0
+    -- Beam selalu diuji kedalamannya (tidak ada "selalu di atas"), jadi garisnya tersembunyi di balik tembok.
+    -- ZOffset kecil hanya mencegah garis berkedip di lantai yang sama tinggi.
+    beam.ZOffset = 0.5
 end
 
 local function Clear()
@@ -102,9 +92,10 @@ local function Draw(points)
 
     for index, point in ipairs(points) do
         local attachment = attachments[index]
-        if not attachment then
+        if not attachment or not attachment.Parent then
             attachment = Instance.new("Attachment")
-            attachment.Parent = anchor
+            attachment.Name = "MugiwaraPathPoint"
+            attachment.Parent = Workspace.Terrain
             attachments[index] = attachment
         end
         attachment.WorldPosition = point
@@ -584,7 +575,8 @@ end
 
 function PlayerPath.Destroy()
     PlayerPath.SetEnabled(false)
-    if folder then folder:Destroy() folder, anchor = nil, nil end
+    if folder then folder:Destroy() folder = nil end
+    for _, attachment in ipairs(attachments) do attachment:Destroy() end
     table.clear(beams)
     table.clear(attachments)
 end

@@ -77,17 +77,6 @@ local function BuildPlayerPath(TargetTab, MugiwaraUI)
     })
 
     PathSection:Toggle({
-        Title = "Line Through Walls",
-        Icon = "lucide:brick-wall",
-        Desc = "Keep the line visible behind walls so you can follow it around corners. The route itself always avoids walls.",
-        Value = Settings.ThroughWalls,
-        Callback = function(Value)
-            Settings.ThroughWalls = Value
-            PlayerPath.Refresh()
-        end
-    })
-
-    PathSection:Toggle({
         Title = "Allow Jumps",
         Icon = "lucide:chevrons-up",
         Desc = "Let the route include jumps over gaps and obstacles.",
