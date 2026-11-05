@@ -502,6 +502,18 @@ function VisualAccessories.Apply(assetId, MugiwaraUI, isAutoApply)
     if equipped and MugiwaraUI and not isAutoApply then MugiwaraUI:Notify({ Title = "Success", Content = "Accessory equipped!", Duration = 3 }) end
 end
 
+-- Melepas satu accessory yang tadi dipasang lewat Apply (dan berhenti dipasang ke rig baru).
+function VisualAccessories.Remove(assetId)
+    VisualAccessories.State.Accessories[assetId] = nil
+    for _, entry in ipairs(GetAllRigs()) do
+        for _, child in ipairs(entry.Rig:GetChildren()) do
+            if child:IsA("Accessory") and child:GetAttribute("IsCustomAccessory") and child:GetAttribute("AssetId") == assetId then
+                child:Destroy()
+            end
+        end
+    end
+end
+
 function VisualAccessories.Clear(MugiwaraUI)
     VisualAccessories.State.Accessories = {}
     local count = 0

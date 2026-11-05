@@ -40,7 +40,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
     end
 
     -- ---------- Path Inspector ----------
-    local InspectorSection = TabTools:Section({ Title = "Path Inspector", Icon = "lucide:scan-search", Opened = true, Box = true })
+    local InspectorSection = TabTools:Section({ Title = "Path Inspector", Icon = "lucide:scan-search", Opened = false, Box = true })
 
     local copyName = KeybindsModule and KeybindsModule.Get("PathInspectorCopy", "F3") or "F3"
     local function ApplyCopyKey(name)

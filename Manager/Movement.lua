@@ -92,6 +92,32 @@ function Movement.TeleportTo(position)
     return true, "Teleported to " .. Movement.FormatPosition(position)
 end
 
+-- Nama semua pemain lain, urut abjad (untuk dropdown Teleport to Player).
+function Movement.GetPlayerList()
+    local list = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then table.insert(list, player.Name) end
+    end
+    table.sort(list)
+    return list
+end
+
+-- Pindah ke dekat pemain `name`: titik di atas posisinya supaya tidak menempel di badannya.
+-- Mengembalikan berhasil, pesan.
+function Movement.TeleportToPlayer(name)
+    local player = name and Players:FindFirstChild(name)
+    if not player or not player:IsA("Player") or player == LocalPlayer then
+        return false, "Player not found or has left the game."
+    end
+    local character = player.Character
+    local root = character and (character:FindFirstChild("HumanoidRootPart") or character.PrimaryPart)
+    if not root then return false, player.DisplayName .. " has no character right now." end
+
+    local ok, message = Movement.TeleportTo(root.Position + Vector3.new(0, 3, 0))
+    if ok then message = "Teleported to " .. player.DisplayName end
+    return ok, message
+end
+
 local function DestroyFlyObjects()
     if flyBodyVelocity then flyBodyVelocity:Destroy() flyBodyVelocity = nil end
     if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
@@ -191,18 +217,56 @@ table.insert(connections, RunService.RenderStepped:Connect(function()
     end
 end))
 
-table.insert(connections, RunService.Stepped:Connect(function()
-    if Movement.NoclipEnabled then
-        local character = LocalPlayer.Character
-        if character then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    part.CanCollide = false
-                end
-            end
-        end
+-- Noclip: SEMUA part karakter (Part, MeshPart, UnionOperation, aksesori) dimatikan tabrakannya, sehingga
+-- tembok dari jenis object apa pun bisa ditembus. Game atau Humanoid sering menyalakan CanCollide lagi,
+-- jadi dimatikan di tiga titik tiap frame (Stepped, PreSimulation, Heartbeat) dan langsung dimatikan lagi
+-- kalau ada yang menyalakannya (sinyal CanCollide). Nilai asli dicatat dan dikembalikan saat noclip mati.
+local noclipOriginal = setmetatable({}, { __mode = "k" }) -- part -> CanCollide asli
+local noclipHooked = setmetatable({}, { __mode = "k" })    -- part -> koneksi sinyal CanCollide
+local noclipWasOn = false
+
+local function DisableCollision(part)
+    if noclipOriginal[part] == nil then noclipOriginal[part] = part.CanCollide end
+    if part.CanCollide then part.CanCollide = false end
+    if not noclipHooked[part] then
+        noclipHooked[part] = part:GetPropertyChangedSignal("CanCollide"):Connect(function()
+            if Movement.NoclipEnabled and part.CanCollide then part.CanCollide = false end
+        end)
     end
-end))
+end
+
+local function ApplyNoclip()
+    local character = LocalPlayer.Character
+    if not character then return end
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then DisableCollision(part) end
+    end
+end
+
+local function RestoreNoclip()
+    for part, connection in pairs(noclipHooked) do
+        connection:Disconnect()
+        noclipHooked[part] = nil
+    end
+    for part, original in pairs(noclipOriginal) do
+        if part.Parent then pcall(function() part.CanCollide = original end) end
+        noclipOriginal[part] = nil
+    end
+end
+
+local function NoclipStep()
+    if Movement.NoclipEnabled then
+        noclipWasOn = true
+        ApplyNoclip()
+    elseif noclipWasOn then
+        noclipWasOn = false
+        RestoreNoclip()
+    end
+end
+
+table.insert(connections, RunService.Stepped:Connect(NoclipStep))
+table.insert(connections, RunService.Heartbeat:Connect(NoclipStep))
+pcall(function() table.insert(connections, RunService.PreSimulation:Connect(NoclipStep)) end)
 
 table.insert(connections, UserInputService.JumpRequest:Connect(function()
     if Movement.InfJumpEnabled then
@@ -292,6 +356,8 @@ getgenv().MugiwaraRegisterCleanup(function()
     if Movement.SpeedEnabled then Movement.RestoreSpeed() end
     if Movement.JumpEnabled then Movement.RestoreJump() end
     if Movement.AnimSpeedEnabled then pcall(ApplyAnimSpeed, 1) end
+    Movement.NoclipEnabled = false
+    RestoreNoclip()
     Movement.SpeedEnabled, Movement.TweenSpeedEnabled = false, false
     Movement.JumpEnabled, Movement.InfJumpEnabled, Movement.NoclipEnabled = false, false, false
     Movement.AnimSpeedEnabled = false

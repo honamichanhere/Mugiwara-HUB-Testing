@@ -24,8 +24,9 @@ local function BuildPlayerPath(TargetTab, MugiwaraUI)
     TargetDropdown = PathSection:Dropdown({
         Title = "Target Player",
         Icon = "lucide:user-search",
-        Desc = "Pick the player to draw a walking route to.",
+        Desc = "Pick the player to draw a walking route to. Type in the box to search.",
         Multi = false,
+        Searchable = true,
         Values = PlayerPath.GetPlayerList(),
         Callback = function(Value)
             -- Callback juga terpanggil saat UI dibuat (nilai kosong): diabaikan.
@@ -49,7 +50,7 @@ local function BuildPlayerPath(TargetTab, MugiwaraUI)
     PathSection:Toggle({
         Title = "Show Path",
         Icon = "lucide:map-pin",
-        Desc = "Draws a route along the floor to the target. It follows walkable ground only and never cuts through walls.",
+        Desc = "Draws a route along the floor to the target, including stairs and ledges. It follows walkable ground only and never cuts through walls.",
         Value = false,
         Callback = function(Value) PlayerPath.SetEnabled(Value) end
     })
@@ -91,11 +92,14 @@ local function BuildPlayerPath(TargetTab, MugiwaraUI)
         Icon = "lucide:chevrons-up",
         Desc = "Let the route include jumps over gaps and obstacles.",
         Value = Settings.AllowJump,
-        Callback = function(Value) Settings.AllowJump = Value end
+        Callback = function(Value)
+            Settings.AllowJump = Value
+            PlayerPath.Recompute()
+        end
     })
 end
 
--- Section "ESP" dan "Player Path" di tab Main (dipakai Universal.lua dan modul game, seperti MovementInjector).
+-- Section "ESP" dan "Player Path" di tab Misc (dipanggil dari Tabs/MiscTab.lua, jadi sama di semua game).
 return function(TargetTab, isPremiumUser, MugiwaraUI)
     if not ESP then
         TargetTab:Paragraph({

@@ -31,27 +31,32 @@ function UI.BuildAccessory(Section, VisualAcc, isPremiumUser, MugiwaraUI)
         end
     end
 
-    Section:Dropdown({
+    -- Multi-select: tiap item yang dicentang dipasang, dan dilepas lagi saat centangnya dihapus.
+    -- `worn` = nama template yang saat ini terpasang lewat dropdown ini.
+    local worn = {}
+    local TemplateDropdown
+    TemplateDropdown = Section:Dropdown({
         Title = "Accessory Templates",
         Icon = "lucide:shirt",
-        Desc = "Choose from popular pre-defined accessories.",
+        Desc = "Tick the accessories you want to wear. Untick one to take it off.",
         Locked = not isPremiumUser,
         LockedTitle = "Premium Only",
+        Multi = true,
         Values = templateNames,
-        Value = "",
-        Callback = function(Option)
-            if Option and Option ~= "" and VisualAcc then
-                local selectedId = nil
-                for _, item in ipairs(VisualAcc.Templates) do
-                    if item.Name == Option then
-                        selectedId = item.ID
-                        break
-                    end
-                end
-                if selectedId then
-                    task.spawn(function()
-                        VisualAcc.Apply(selectedId, MugiwaraUI)
-                    end)
+        Value = {},
+        Callback = function(Selected)
+            if not VisualAcc or type(Selected) ~= "table" then return end
+
+            local wanted = {}
+            for _, name in ipairs(Selected) do wanted[name] = true end
+
+            for _, item in ipairs(VisualAcc.Templates) do
+                if wanted[item.Name] and not worn[item.Name] then
+                    worn[item.Name] = true
+                    task.spawn(function() VisualAcc.Apply(item.ID, MugiwaraUI) end)
+                elseif not wanted[item.Name] and worn[item.Name] then
+                    worn[item.Name] = nil
+                    VisualAcc.Remove(item.ID)
                 end
             end
         end
@@ -87,6 +92,43 @@ function UI.BuildAccessory(Section, VisualAcc, isPremiumUser, MugiwaraUI)
         LockedTitle = "Premium Only",
         Callback = function()
             if VisualAcc then VisualAcc.Clear(MugiwaraUI) end
+            -- Centang di dropdown ikut dilepas (tanpa memicu callback-nya).
+            worn = {}
+            pcall(function() TemplateDropdown:Set({}, true) end)
+        end
+    })
+end
+
+-- Avatar Changer: `AvatarChanger` adalah Manager/AvatarChanger.lua (Evade mengirim versi dengan rig-nya sendiri).
+function UI.BuildAvatar(Section, AvatarChanger, isPremiumUser, MugiwaraUI)
+    if not Claim("Avatar") then return end
+
+    local AvatarInput
+    AvatarInput = Section:Input({
+        Title = "Morph By Username",
+        Icon = "lucide:user-round",
+        Desc = "Copy any player's avatar exactly 1:1.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Placeholder = "Username...",
+        Callback = function(Text)
+            if not Text or Text == "" then return end
+
+            task.spawn(function()
+                if AvatarChanger then AvatarChanger.Apply(Text, MugiwaraUI) end
+            end)
+            pcall(function() AvatarInput:Set("") end)
+        end
+    })
+
+    Section:Button({
+        Title = "Revert to Original",
+        Icon = "lucide:undo-2",
+        Desc = "Back to original avatar.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Callback = function()
+            if AvatarChanger then AvatarChanger.Clear(true, MugiwaraUI) end
         end
     })
 end

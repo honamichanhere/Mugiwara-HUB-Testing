@@ -61,7 +61,9 @@ local function CreateBillboard(entry, anchor)
     label.TextWrapped = true
     label.Parent = billboard
 
-    billboard.Parent = anchor
+    -- Label ditaruh di karakter (bukan di Head) dan hanya "menempel" lewat Adornee, jadi tidak ikut hilang
+    -- kalau game mengganti Head.
+    billboard.Parent = entry.Character
     entry.Billboard = billboard
     entry.Label = label
 end
@@ -76,25 +78,23 @@ local function Detach(player)
     if entry.Billboard then entry.Billboard:Destroy() end
 end
 
+local function CreateHighlight(entry)
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "MugiwaraESP"
+    highlight.Adornee = entry.Character
+    highlight.Parent = entry.Character
+    entry.Highlight = highlight
+end
+
 local function Attach(player, character)
     Detach(player)
 
-    local highlight = Instance.new("Highlight")
-    highlight.Name = "MugiwaraESP"
-    highlight.Adornee = character
-    highlight.Parent = character
-
-    local entry = { Character = character, Highlight = highlight }
+    local entry = { Character = character }
     tracked[player] = entry
+    CreateHighlight(entry)
     ApplyStyle(entry)
-
-    -- Label menempel di kepala; tunggu karakternya selesai dimuat tanpa menahan yang lain.
-    task.spawn(function()
-        local anchor = character:WaitForChild("Head", 5) or character:WaitForChild("HumanoidRootPart", 5)
-        if not anchor or tracked[player] ~= entry then return end
-        CreateBillboard(entry, anchor)
-        ApplyStyle(entry)
-    end)
+    -- Label (nama / jarak) dibuat oleh Update begitu kepalanya ada, jadi pemain yang baru masuk dan
+    -- karakternya baru termuat pun langsung dapat label tanpa menunggu atau menyalakan ulang ESP.
 end
 
 local function Track(player)
@@ -125,10 +125,45 @@ local function OriginPosition()
     return camera and camera.CFrame.Position or nil
 end
 
+-- Memastikan outline dan label masih hidup dan menempel di bagian yang benar: game bisa mengganti Head
+-- atau menghapus anak karakter kapan saja, dan karakter pemain baru sering termuat belakangan.
+local function EnsureParts(entry)
+    if not entry.Highlight or not entry.Highlight.Parent then
+        if entry.Highlight then entry.Highlight:Destroy() end
+        CreateHighlight(entry)
+        ApplyStyle(entry)
+    end
+
+    local character = entry.Character
+    local anchor = character:FindFirstChild("Head") or character:FindFirstChild("HumanoidRootPart")
+    if not anchor then return end
+
+    local billboard = entry.Billboard
+    if not billboard or not billboard.Parent or billboard.Adornee ~= anchor then
+        if billboard then billboard:Destroy() end
+        CreateBillboard(entry, anchor)
+        ApplyStyle(entry)
+    end
+end
+
 local function Update()
     local origin = OriginPosition()
     if not origin then return end
     local settings = ESP.Settings
+
+    -- Karakter yang belum / tidak lagi tercatat (dibuat ulang game tanpa CharacterAdded, atau pemain baru).
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local character = player.Character
+            local entry = tracked[player]
+            if character and character.Parent and (not entry or entry.Character ~= character) then
+                Track(player)
+                if not tracked[player] or tracked[player].Character ~= character then
+                    Attach(player, character)
+                end
+            end
+        end
+    end
 
     for player, entry in pairs(tracked) do
         local character = entry.Character
@@ -137,6 +172,7 @@ local function Update()
             -- Karakter hilang tanpa CharacterRemoving (dihapus game): bersihkan.
             if not character.Parent then Detach(player) end
         else
+            EnsureParts(entry)
             local distance = (root.Position - origin).Magnitude
             local visible = distance <= settings.MaxDistance
             entry.Highlight.Enabled = visible

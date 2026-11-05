@@ -46,34 +46,8 @@ return function(Window, isPremiumUser, MugiwaraUI)
 
     local AvatarSection = PremiumSection:Section({ Title = "Avatar Changer", Icon = "lucide:user-round", Opened = false })
 
-    local AvatarInput
-    AvatarInput = AvatarSection:Input({
-        Title = "Morph By Username",
-        Icon = "lucide:user-round",
-        Desc = "Copy any player's avatar exactly 1:1.",
-        Locked = not isPremiumUser,
-        LockedTitle = "Premium Only",
-        Placeholder = "Username...",
-        Callback = function(Text)
-            if not Text or Text == "" then return end 
-            
-            task.spawn(function()
-                if AvatarChangerModule then AvatarChangerModule.Apply(Text, MugiwaraUI) end
-            end)
-            pcall(function() AvatarInput:Set("") end)
-        end
-    })
-
-    AvatarSection:Button({
-        Title = "Revert to Original",
-        Icon = "lucide:undo-2",
-        Desc = "Back to original avatar.",
-        Locked = not isPremiumUser,
-        LockedTitle = "Premium Only",
-        Callback = function()
-            if AvatarChangerModule then AvatarChangerModule.Clear(true, MugiwaraUI) end
-        end
-    })
+    -- Dibangun oleh Tabs/VisualAvatarUI.lua (dipakai juga oleh Universal).
+    if VisualAvatarUI then VisualAvatarUI.BuildAvatar(AvatarSection, AvatarChangerModule, isPremiumUser, MugiwaraUI) end
 
     -- Visual Emotes (premium): tukar tampilan dua emote.
     if VisualEmotesUI then
@@ -171,11 +145,6 @@ return function(Window, isPremiumUser, MugiwaraUI)
     local injectMovement = getgenv().MugiwaraImport("Tabs/MovementInjector.lua")
     if injectMovement then
         injectMovement(TabMain, isPremiumUser, MugiwaraUI)
-    end
-
-    local injectEsp = getgenv().MugiwaraImport("Tabs/EspInjector.lua")
-    if injectEsp then
-        injectEsp(TabMain, isPremiumUser, MugiwaraUI)
     end
 
     pcall(function() Window:SelectTab(2) end)

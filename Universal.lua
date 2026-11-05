@@ -1,5 +1,6 @@
 local VisualAccModule = getgenv().MugiwaraImport("Manager/VisualAccessories.lua")
 local VisualAvatarUI = getgenv().MugiwaraImport("Tabs/VisualAvatarUI.lua")
+local AvatarChangerModule = getgenv().MugiwaraImport("Manager/AvatarChanger.lua")
 
 -- Dipakai untuk game yang tidak punya modul sendiri (Main.lua memilih salah satu: modul game ATAU Universal,
 -- tidak pernah dua-duanya). Accessory dan Korless di sini mengubah karakter bawaan Roblox (R6 / R15);
@@ -28,13 +29,13 @@ return function(Window, isPremiumUser, MugiwaraUI)
 
         local KorlessSection = PremiumSection:Section({ Title = "Korless", Icon = "lucide:skull", Opened = false })
         VisualAvatarUI.BuildKorless(KorlessSection, VisualAccModule, isPremiumUser, MugiwaraUI)
+
+        local AvatarSection = PremiumSection:Section({ Title = "Avatar Changer", Icon = "lucide:user-round", Opened = false })
+        VisualAvatarUI.BuildAvatar(AvatarSection, AvatarChangerModule, isPremiumUser, MugiwaraUI)
     end
 
     local injectMovement = getgenv().MugiwaraImport("Tabs/MovementInjector.lua")
     if injectMovement then injectMovement(TabMain, isPremiumUser, MugiwaraUI) end
-
-    local injectEsp = getgenv().MugiwaraImport("Tabs/EspInjector.lua")
-    if injectEsp then injectEsp(TabMain, isPremiumUser, MugiwaraUI) end
 
     pcall(function() Window:SelectTab(2) end)
 end

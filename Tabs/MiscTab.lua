@@ -136,6 +136,15 @@ return function(Window, isPremiumUser, MugiwaraUI)
     })
 
     -- ==========================================
+    -- PLAYER ESP + PLAYER PATH
+    -- ==========================================
+    local injectEsp = getgenv().MugiwaraImport("Tabs/EspInjector.lua")
+    if injectEsp then
+        local ok, err = pcall(injectEsp, TabMisc, isPremiumUser, MugiwaraUI)
+        if not ok then warn("[Mugiwara HUB] ESP / Player Path UI error: " .. tostring(err)) end
+    end
+
+    -- ==========================================
     -- KEYBOARD SHORTCUTS
     -- ==========================================
     if ShortcutsUI then

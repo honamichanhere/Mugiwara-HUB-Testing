@@ -302,11 +302,17 @@ function UI.Build(Section, config, MugiwaraUI)
             MaxHeight = 300,
             Viewport = LOOK,
             Callback = function(Option)
-                side.IsOpen = false -- memilih satu item menutup grid (pilihan tunggal)
                 local entry = type(Option) == "string" and side.Lookup[Option] or nil
                 if isBase then base = entry else target = entry end
                 Picked(entry)
                 Refresh()
+                -- Pilihan tunggal menutup grid sesudah callback ini; grid dibuka lagi supaya bisa langsung
+                -- ganti pilihan (tutup dengan klik judulnya). Dijalankan sesudah penutupan itu.
+                if side.IsOpen then
+                    task.defer(function()
+                        if side.IsOpen then side.Grid:Open() end
+                    end)
+                end
             end
         })
 

@@ -6,7 +6,9 @@ return function(Window, isPremiumUser, MugiwaraUI)
 
     local PremiumSection = TabCamera:Section({ Title = '<font color="#ffff82">Premium Features</font>', Icon = "rbxassetid://74594159374416", IconColor = Color3.fromRGB(255, 255, 130), Opened = false, Box = true })
     
-    local ToggleFreecam = PremiumSection:Toggle({
+    local FreeSection = PremiumSection:Section({ Title = "Free Camera", Icon = "lucide:video", Opened = false })
+
+    local ToggleFreecam = FreeSection:Toggle({
         Title = "Enable Free Camera",
         Icon = "lucide:video",
         Desc = "Detach camera. Move with WASD/QE. Rotate by holding Right-Click or using Arrow Keys.",
@@ -20,7 +22,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
     -- Referensi toggle dipakai shortcut keyboard (tab Misc) supaya tombol UI ikut berubah.
     CameraModule.UI = { Freecam = ToggleFreecam }
 
-    PremiumSection:Slider({
+    FreeSection:Slider({
         Title = "Free Camera Speed",
         Icon = "lucide:gauge",
         Desc = "Adjust the movement speed of the free camera.",
@@ -33,9 +35,9 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Divider({ Title = "Free Camera Look" })
+    local LookSection = PremiumSection:Section({ Title = "Free Camera Look", Icon = "lucide:mouse-pointer-2", Opened = false })
 
-    PremiumSection:Toggle({
+    LookSection:Toggle({
         Title = "Match Roblox Sensitivity",
         Icon = "lucide:mouse-pointer-2",
         Desc = "Turn the free camera with the Camera Sensitivity from your Roblox settings. Turn off to use the slider below.",
@@ -47,7 +49,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Slider({
+    LookSection:Slider({
         Title = "Mouse Sensitivity",
         Icon = "lucide:mouse",
         Desc = "Right-Click turning speed when Match Roblox Sensitivity is off. 1 = Roblox default.",
@@ -61,7 +63,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Slider({
+    LookSection:Slider({
         Title = "Horizontal Speed (Left / Right)",
         Icon = "lucide:move-horizontal",
         Desc = "How fast the camera turns left and right. Applies to Right-Click and the Left / Right Arrow Keys.",
@@ -75,7 +77,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Slider({
+    LookSection:Slider({
         Title = "Vertical Speed (Up / Down)",
         Icon = "lucide:move-vertical",
         Desc = "How fast the camera turns up and down. Applies to Right-Click and the Up / Down Arrow Keys.",
@@ -89,10 +91,10 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Divider({ Title = "Observation Mode" })
+    local ObserveSection = PremiumSection:Section({ Title = "Observation Mode", Icon = "lucide:eye", Opened = false })
 
     local DropdownSpectate
-    DropdownSpectate = PremiumSection:Dropdown({
+    DropdownSpectate = ObserveSection:Dropdown({
         Title = "Spectate Player",
         Icon = "lucide:eye",
         Desc = "Select a player from the server to observe their perspective.",
@@ -110,7 +112,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Button({
+    ObserveSection:Button({
         Title = "Refresh Player List",
         Desc = "Update the dropdown with the current active players in the server.",
         Locked = not isPremiumUser,
@@ -124,7 +126,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Button({
+    ObserveSection:Button({
         Title = "Stop Spectating",
         Desc = "Return the camera to your own local character.",
         Locked = not isPremiumUser,
@@ -136,9 +138,9 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Divider({ Title = "Global Stabilizer Engine" })
+    local StabilizerSection = PremiumSection:Section({ Title = "Global Stabilizer Engine", Icon = "lucide:move", Opened = false })
 
-    PremiumSection:Slider({
+    StabilizerSection:Slider({
         Title = "Position Stabilizer",
         Icon = "lucide:move",
         Desc = "Adds spring-like lag to character tracking.",
@@ -151,7 +153,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
-    PremiumSection:Slider({
+    StabilizerSection:Slider({
         Title = "Rotation Stabilizer",
         Icon = "lucide:rotate-3d",
         Desc = "Smooths out camera aiming for a cinematic feel.",
