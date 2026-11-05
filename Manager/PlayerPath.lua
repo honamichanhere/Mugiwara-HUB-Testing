@@ -20,8 +20,7 @@ local LocalPlayer = Players.LocalPlayer
 
 PlayerPath.Settings = {
     Color = Color3.fromRGB(0, 170, 255),
-    Thickness = 0.5,        -- lebar garis (studs)
-    ThroughWalls = true,    -- garis terlihat menembus tembok (tampilan saja; jalurnya tetap lewat jalan yang benar)
+    Thickness = 0.3,        -- tebal garis (studs)
     AgentRadius = 2,
     AgentHeight = 5,
     AllowJump = true,       -- jalur boleh melewati lompatan
@@ -54,7 +53,7 @@ local lastStatus = nil
 local pathLength = nil
 local connection
 local folder
-local beams, attachments = {}, {} -- Beam dan Attachment yang dipakai ulang (rantai: beam i = titik i ke titik i+1)
+local segments = {}  -- Part yang dipakai ulang (ruas i = titik i ke titik i+1)
 local lastStart, lastEnd, lastTime, lastFailed = nil, nil, 0, false
 
 -- ---------- Gambar ----------
@@ -66,60 +65,49 @@ local function EnsureFolder()
 
     folder = Instance.new("Folder")
     folder.Name = "MugiwaraPlayerPath"
-
-    -- Beam-nya ada di folder ini; Attachment-nya ditaruh di Terrain (induk standar untuk Attachment tanpa Part).
     folder.Parent = camera
-    table.clear(beams)
+    table.clear(segments)
     return true
 end
 
-local function StyleBeam(beam)
-    local settings = PlayerPath.Settings
-    beam.Color = ColorSequence.new(settings.Color)
-    beam.Width0, beam.Width1 = settings.Thickness, settings.Thickness
-    -- Beam selalu diuji kedalamannya (tidak ada "selalu di atas"), jadi garisnya tersembunyi di balik tembok.
-    -- ZOffset kecil hanya mencegah garis berkedip di lantai yang sama tinggi.
-    beam.ZOffset = 0.5
-end
-
 local function Clear()
-    for _, beam in ipairs(beams) do beam.Enabled = false end
+    for _, part in ipairs(segments) do part.Parent = nil end
     pathLength = nil
 end
 
 local function Draw(points)
     if not EnsureFolder() then return end
 
-    for index, point in ipairs(points) do
-        local attachment = attachments[index]
-        if not attachment or not attachment.Parent then
-            attachment = Instance.new("Attachment")
-            attachment.Name = "MugiwaraPathPoint"
-            attachment.Parent = Workspace.Terrain
-            attachments[index] = attachment
-        end
-        attachment.WorldPosition = point
-    end
-
     local count = #points - 1
     for index = 1, count do
-        local beam = beams[index]
-        if not beam then
-            beam = Instance.new("Beam")
-            beam.FaceCamera = true      -- pita datar yang selalu menghadap kamera
-            beam.LightEmission = 1
-            beam.LightInfluence = 0
-            beam.Segments = 1
-            beam.Transparency = NumberSequence.new(0.1)
-            beam.Parent = folder
-            beams[index] = beam
+        local part = segments[index]
+        if not part then
+            part = Instance.new("Part")
+            part.Name = "MugiwaraPathSegment"
+            part.Anchored = true
+            part.CanCollide = false
+            part.CanQuery = false
+            part.CanTouch = false
+            part.CastShadow = false
+            part.Material = Enum.Material.SmoothPlastic
+            part.TopSurface = Enum.SurfaceType.Smooth
+            part.BottomSurface = Enum.SurfaceType.Smooth
+            segments[index] = part
         end
-        beam.Attachment0 = attachments[index]
-        beam.Attachment1 = attachments[index + 1]
-        StyleBeam(beam)
-        beam.Enabled = true
+        local from, to = points[index], points[index + 1]
+        local length = (to - from).Magnitude
+        local thickness = PlayerPath.Settings.Thickness
+        -- Satu Part kecil per ruas: Plastic (bukan Neon), tanpa bayangan, tanpa tabrakan / raycast / sentuhan.
+        part.Color = PlayerPath.Settings.Color
+        if length < 0.01 then
+            part.Parent = nil
+        else
+            part.Size = Vector3.new(thickness, thickness, length + thickness) -- sedikit lebih panjang supaya sambungan rapat
+            part.CFrame = CFrame.lookAt((from + to) / 2, to)
+            part.Parent = folder
+        end
     end
-    for index = count + 1, #beams do beams[index].Enabled = false end
+    for index = count + 1, #segments do segments[index].Parent = nil end
 end
 
 -- ---------- Status ----------
@@ -525,9 +513,13 @@ function PlayerPath.GetPlayerList()
     return list
 end
 
--- Dipanggil saat tampilan berubah (warna, tebal, tembus tembok); jalurnya sendiri tidak dihitung ulang.
+-- Dipanggil saat tampilan berubah (warna, tebal); jalurnya sendiri tidak dihitung ulang.
 function PlayerPath.Refresh()
-    for _, beam in ipairs(beams) do StyleBeam(beam) end
+    for _, part in ipairs(segments) do
+        part.Color = PlayerPath.Settings.Color
+        local thickness = PlayerPath.Settings.Thickness
+        part.Size = Vector3.new(thickness, thickness, part.Size.Z)
+    end
 end
 
 -- Dipanggil saat pengaturan jalur berubah (mis. Allow Jumps): jalur dihitung ulang di pemeriksaan berikutnya.
@@ -576,9 +568,8 @@ end
 function PlayerPath.Destroy()
     PlayerPath.SetEnabled(false)
     if folder then folder:Destroy() folder = nil end
-    for _, attachment in ipairs(attachments) do attachment:Destroy() end
-    table.clear(beams)
-    table.clear(attachments)
+    for _, part in ipairs(segments) do part:Destroy() end
+    table.clear(segments)
 end
 
 if getgenv().MugiwaraRegisterCleanup then
