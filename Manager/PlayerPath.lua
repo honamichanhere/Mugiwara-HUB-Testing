@@ -20,7 +20,7 @@ local LocalPlayer = Players.LocalPlayer
 
 PlayerPath.Settings = {
     Color = Color3.fromRGB(0, 170, 255),
-    Thickness = 0.3,        -- tebal garis (studs)
+    Thickness = 0.5,        -- lebar garis (studs)
     ThroughWalls = true,    -- garis terlihat menembus tembok (tampilan saja; jalurnya tetap lewat jalan yang benar)
     AgentRadius = 2,
     AgentHeight = 5,
@@ -39,7 +39,7 @@ local LIFT = 0.6                -- garis diangkat sedikit dari lantai supaya tid
 -- Pencarian sendiri (tahap 2)
 local CELL = 3                  -- jarak antar titik (studs)
 local STEP_UP = 2.6             -- naik setinggi ini dianggap melangkah (tangga)
-local JUMP_UP = 5.5             -- naik setinggi ini harus melompat (kalau Allow Jumps)
+local JUMP_UP = 4               -- naik setinggi ini harus melompat (kalau Allow Jumps); lebih tinggi dari ini harus lewat tangga
 local MAX_DROP = 10             -- turun sejauh ini masih dianggap jalan
 local CLEAR_BOTTOM = 1.2        -- ruang kepala dicek mulai setinggi ini di atas lantai (tangga di samping tidak dihitung)
 local CLEAR_RADIUS = 1.2
@@ -54,7 +54,7 @@ local lastStatus = nil
 local pathLength = nil
 local connection
 local folder, anchor
-local segments = {}         -- BoxHandleAdornment yang dipakai ulang
+local beams, attachments = {}, {} -- Beam dan Attachment yang dipakai ulang (rantai: beam i = titik i ke titik i+1)
 local lastStart, lastEnd, lastTime, lastFailed = nil, nil, 0, false
 
 -- ---------- Gambar ----------
@@ -67,7 +67,7 @@ local function EnsureFolder()
     folder = Instance.new("Folder")
     folder.Name = "MugiwaraPlayerPath"
 
-    -- Adornment butuh Adornee; satu Part tak terlihat di titik 0 jadi acuan semuanya.
+    -- Attachment butuh Part sebagai induk; satu Part tak terlihat di titik 0 jadi tempat semuanya.
     anchor = Instance.new("Part")
     anchor.Name = "Anchor"
     anchor.Anchored = true
@@ -78,38 +78,57 @@ local function EnsureFolder()
     anchor.Parent = folder
 
     folder.Parent = camera
-    table.clear(segments)
+    table.clear(beams)
+    table.clear(attachments)
     return true
 end
 
+local function StyleBeam(beam)
+    local settings = PlayerPath.Settings
+    beam.Color = ColorSequence.new(settings.Color)
+    beam.Width0, beam.Width1 = settings.Thickness, settings.Thickness
+    -- Beam selalu diuji kedalamannya; ZOffset besar menggesernya ke depan kamera supaya tetap terlihat
+    -- di balik tembok (hanya tampilan, jalurnya sendiri tetap lewat jalan yang benar).
+    beam.ZOffset = settings.ThroughWalls and 1000 or 0
+end
+
 local function Clear()
-    for _, segment in ipairs(segments) do segment.Visible = false end
+    for _, beam in ipairs(beams) do beam.Enabled = false end
     pathLength = nil
 end
 
 local function Draw(points)
     if not EnsureFolder() then return end
-    local settings = PlayerPath.Settings
+
+    for index, point in ipairs(points) do
+        local attachment = attachments[index]
+        if not attachment then
+            attachment = Instance.new("Attachment")
+            attachment.Parent = anchor
+            attachments[index] = attachment
+        end
+        attachment.WorldPosition = point
+    end
 
     local count = #points - 1
     for index = 1, count do
-        local segment = segments[index]
-        if not segment then
-            segment = Instance.new("BoxHandleAdornment")
-            segment.Adornee = anchor
-            segment.Transparency = 0.15
-            segment.Parent = folder
-            segments[index] = segment
+        local beam = beams[index]
+        if not beam then
+            beam = Instance.new("Beam")
+            beam.FaceCamera = true      -- pita datar yang selalu menghadap kamera
+            beam.LightEmission = 1
+            beam.LightInfluence = 0
+            beam.Segments = 1
+            beam.Transparency = NumberSequence.new(0.1)
+            beam.Parent = folder
+            beams[index] = beam
         end
-        local from, to = points[index], points[index + 1]
-        local length = (to - from).Magnitude
-        segment.Size = Vector3.new(settings.Thickness, settings.Thickness, math.max(length, 0.01))
-        segment.CFrame = CFrame.lookAt(from:Lerp(to, 0.5), to)
-        segment.Color3 = settings.Color
-        segment.AlwaysOnTop = settings.ThroughWalls
-        segment.Visible = true
+        beam.Attachment0 = attachments[index]
+        beam.Attachment1 = attachments[index + 1]
+        StyleBeam(beam)
+        beam.Enabled = true
     end
-    for index = count + 1, #segments do segments[index].Visible = false end
+    for index = count + 1, #beams do beams[index].Enabled = false end
 end
 
 -- ---------- Status ----------
@@ -163,6 +182,40 @@ local function WallBetween(a, b, params)
     return Workspace:Raycast(from, to - from, params) ~= nil
 end
 
+-- true kalau garis a -> b menempel ke lantai: di tiap ~1,5 studs ada lantai yang tingginya hampir sama dengan
+-- garis. Garis yang memotong ke atas lewat tangga, melayang di atas lubang tangga, atau menembus anak
+-- tangga TIDAK lolos, jadi jalur seperti itu dibuang dan dicari ulang yang mengikuti anak tangga.
+local function HugsGround(a, b, params)
+    local distance = (b - a).Magnitude
+    local samples = math.max(1, math.ceil(distance / 1.5))
+    for index = 1, samples - 1 do
+        local point = a:Lerp(b, index / samples)
+        local hit = Workspace:Raycast(point + Vector3.new(0, 3, 0), Vector3.new(0, -9, 0), params)
+        if not hit or math.abs(hit.Position.Y - point.Y) > 1.8 then return false end
+    end
+    return true
+end
+
+-- Jalur digambar mengikuti lantai: tiap ~2,5 studs titiknya ditempelkan ke tinggi lantai sebenarnya, jadi di
+-- tangga garisnya naik anak tangga demi anak tangga (berbelok mengikuti tangga), bukan lurus menanjak.
+local function Conform(points, params)
+    local result = {}
+    for index = 1, #points - 1 do
+        local a, b = points[index], points[index + 1]
+        local pieces = math.max(1, math.ceil((b - a).Magnitude / 2.5))
+        for piece = 0, pieces - 1 do
+            local point = a:Lerp(b, piece / pieces)
+            local hit = Workspace:Raycast(point + Vector3.new(0, 3, 0), Vector3.new(0, -9, 0), params)
+            if hit and math.abs(hit.Position.Y - point.Y) <= 2.5 then
+                point = Vector3.new(point.X, hit.Position.Y, point.Z)
+            end
+            table.insert(result, point)
+        end
+    end
+    table.insert(result, points[#points])
+    return result
+end
+
 -- ---------- Tahap 1: PathfindingService ----------
 
 local function NavmeshPath(startPoint, endPoint, params)
@@ -186,7 +239,7 @@ local function NavmeshPath(startPoint, endPoint, params)
     if flat > 10 or math.abs(last.Y - endPoint.Y) > 10 then return nil end
 
     for index = 1, #points - 1 do
-        if WallBetween(points[index], points[index + 1], params) then return nil end
+        if WallBetween(points[index], points[index + 1], params) or not HugsGround(points[index], points[index + 1], params) then return nil end
     end
     return points
 end
@@ -333,7 +386,7 @@ local function GridPath(startPoint, goalPoint, ignore, params, token)
                             if not (known and known.Closed) then
                                 local step = (direction[1] ~= 0 and direction[2] ~= 0) and CELL * 1.414 or CELL
                                 local cost = step + math.abs(rise) * 0.5
-                                if rise > STEP_UP then cost = cost + 6 end -- melompat lebih mahal daripada tangga
+                                if rise > STEP_UP then cost = cost + 12 end -- melompat jauh lebih mahal daripada memutar lewat tangga
                                 if not known then cost = cost + WallPenalty(neighbour) end
                                 local g = current.G + cost
                                 if not known or g < known.G then
@@ -412,7 +465,7 @@ local function Compute(token)
         return
     end
 
-    points = Simplify(points)
+    points = Conform(Simplify(points), params)
     local lifted, length = {}, 0
     for index, point in ipairs(points) do
         lifted[index] = point + Vector3.new(0, LIFT, 0)
@@ -483,12 +536,7 @@ end
 
 -- Dipanggil saat tampilan berubah (warna, tebal, tembus tembok); jalurnya sendiri tidak dihitung ulang.
 function PlayerPath.Refresh()
-    local settings = PlayerPath.Settings
-    for _, segment in ipairs(segments) do
-        segment.Color3 = settings.Color
-        segment.AlwaysOnTop = settings.ThroughWalls
-        segment.Size = Vector3.new(settings.Thickness, settings.Thickness, segment.Size.Z)
-    end
+    for _, beam in ipairs(beams) do StyleBeam(beam) end
 end
 
 -- Dipanggil saat pengaturan jalur berubah (mis. Allow Jumps): jalur dihitung ulang di pemeriksaan berikutnya.
@@ -537,7 +585,8 @@ end
 function PlayerPath.Destroy()
     PlayerPath.SetEnabled(false)
     if folder then folder:Destroy() folder, anchor = nil, nil end
-    table.clear(segments)
+    table.clear(beams)
+    table.clear(attachments)
 end
 
 if getgenv().MugiwaraRegisterCleanup then

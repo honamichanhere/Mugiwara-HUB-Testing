@@ -23,6 +23,8 @@ Movement.FlyEnabled = false
 Movement.FlySpeed = 16
 
 Movement.NoclipEnabled = false
+Movement.BlockSnapBack = true   -- noclip: lawan loncatan balik mendadak (game / server menarik kita ke belakang)
+Movement.SnapIgnoreUntil = 0    -- dipakai TeleportTo: lompatan kita sendiri tidak dianggap tarikan balik
 
 local currentJumps = 0
 local lastJumpTime = 0
@@ -85,6 +87,7 @@ function Movement.TeleportTo(position)
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return false, "Your character is not ready yet." end
 
+    Movement.SnapIgnoreUntil = os.clock() + 0.5
     local rotation = root.CFrame - root.CFrame.Position
     char:PivotTo(CFrame.new(position) * rotation)
     root.AssemblyLinearVelocity = Vector3.zero
@@ -264,6 +267,46 @@ local function NoclipStep()
     end
 end
 
+-- Anti tarikan balik: saat tembus tembok, game bisa memindahkan kita mendadak ke posisi sebelumnya (anti-noclip
+-- milik game, atau koreksi server). Kalau akar karakter melompat jauh dalam satu frame padahal kita tidak
+-- melakukannya, posisinya dikembalikan ke posisi frame sebelumnya. Kalau tarikan itu terus berulang (mis.
+-- teleport ronde yang memang disengaja game), penjagaan berhenti sebentar supaya tidak melawan game.
+local lastRootPosition = nil
+local snapTimes = {}
+local snapPausedUntil = 0
+
+local function SnapGuard(deltaTime)
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not (Movement.NoclipEnabled and Movement.BlockSnapBack and root) or os.clock() < snapPausedUntil or os.clock() < Movement.SnapIgnoreUntil then
+        lastRootPosition = root and root.Position or nil
+        return
+    end
+
+    local position = root.Position
+    if lastRootPosition then
+        local topSpeed = math.max(Movement.OriginalSpeed, Movement.SpeedEnabled and Movement.SpeedValue or 0,
+            Movement.TweenSpeedEnabled and Movement.TweenSpeedValue or 0, Movement.FlyEnabled and Movement.FlySpeed or 0, 50)
+        local allowed = topSpeed * math.max(deltaTime, 1 / 60) * 3 + 3
+        if (position - lastRootPosition).Magnitude > allowed then
+            -- hanya menghitung tarikan dalam 1 detik terakhir
+            local now = os.clock()
+            table.insert(snapTimes, now)
+            while snapTimes[1] and now - snapTimes[1] > 1 do table.remove(snapTimes, 1) end
+            if #snapTimes > 6 then
+                snapPausedUntil = now + 3
+                table.clear(snapTimes)
+                lastRootPosition = position
+                return
+            end
+            root.CFrame = CFrame.new(lastRootPosition) * (root.CFrame - root.CFrame.Position)
+            root.AssemblyLinearVelocity = Vector3.zero
+            return
+        end
+    end
+    lastRootPosition = position
+end
+
+table.insert(connections, RunService.Heartbeat:Connect(SnapGuard))
 table.insert(connections, RunService.Stepped:Connect(NoclipStep))
 table.insert(connections, RunService.Heartbeat:Connect(NoclipStep))
 pcall(function() table.insert(connections, RunService.PreSimulation:Connect(NoclipStep)) end)

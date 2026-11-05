@@ -44,6 +44,14 @@ return function(TargetTab, isPremiumUser, MugiwaraUI)
 
     local ToggleNoclip = CollisionSection:Toggle({ Title = "Enable Noclip", Icon = "lucide:ghost", Desc = Risk.Desc("Noclip", "Walk through walls and any other object. Works on the ground and in the air."), Callback = function(Value) Risk.Warn(MugiwaraUI, "Noclip", Value); MovementModule.NoclipEnabled = Value end })
 
+    CollisionSection:Toggle({
+        Title = "Block Snap-Back",
+        Icon = "lucide:shield",
+        Desc = "While noclip is on, undo it when the game suddenly pulls you back after walking through a wall.",
+        Value = true,
+        Callback = function(Value) MovementModule.BlockSnapBack = Value end
+    })
+
     -- ---------- Teleport ----------
     local TeleportSection = MovementSection:Section({ Title = "Teleport", Icon = "lucide:navigation", Opened = false })
 
