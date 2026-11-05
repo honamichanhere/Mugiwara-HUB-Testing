@@ -224,6 +224,74 @@ local TRANSIENT_MESSAGES = {
     RATE_LIMITED = "Too many attempts. Please wait a moment and try again.",
 }
 
+-- Log diagnosa auth: tiap validasi yang gagal mencetak info perangkat + hasil tiap percobaan ke console
+-- (F9) dan menyimpannya ke MugiwaraHub/AuthLog.txt, jadi pemain bisa kirim file itu saat key gagal.
+-- Key tidak pernah ditulis utuh (disamarkan).
+local AUTH_LOG_PATH = FOLDER .. "/AuthLog.txt"
+
+local function MaskKey(key)
+    if #key <= 8 then return string.rep("*", #key) end
+    return key:sub(1, 4) .. string.rep("*", #key - 6) .. key:sub(-2)
+end
+
+local function DescribeValue(value)
+    if type(value) ~= "table" then return tostring(value) end
+    local parts = {}
+    for k, v in pairs(value) do
+        table.insert(parts, tostring(k) .. "=" .. (type(v) == "table" and "{...}" or tostring(v)))
+    end
+    table.sort(parts)
+    return "{ " .. table.concat(parts, ", ") .. " }"
+end
+
+local function DeviceInfo()
+    local lines = {}
+    local function add(label, getter)
+        local ok, value = pcall(getter)
+        table.insert(lines, label .. ": " .. (ok and tostring(value) or ("error (" .. tostring(value) .. ")")))
+    end
+    add("Hub", function() return "v" .. VERSION .. " (" .. BRANCH .. ")" end)
+    add("Executor", function()
+        if identifyexecutor then return table.concat({ identifyexecutor() }, " ") end
+        return "unknown (no identifyexecutor)"
+    end)
+    add("Platform", function() return game:GetService("UserInputService"):GetPlatform().Name end)
+    add("HTTP functions", function()
+        return ("request=%s http_request=%s http.request=%s"):format(
+            tostring(type(request) == "function"), tostring(type(http_request) == "function"),
+            tostring(type(http) == "table" and type(http.request) == "function"))
+    end)
+    add("Libraries", function()
+        return ("bit32=%s buffer=%s"):format(tostring(type(bit32) == "table"), tostring(type(buffer) == "table"))
+    end)
+    add("Device time (UTC)", function() return DateTime.now():ToIsoDate() end)
+    add("Clock offset vs Roblox server (s)", function()
+        return ("%.1f"):format(os.time() - workspace:GetServerTimeNow())
+    end)
+    add("PUSL functions", function()
+        local names = {}
+        for k, v in pairs(PUSL) do
+            if type(v) == "function" then table.insert(names, tostring(k)) end
+        end
+        table.sort(names)
+        return table.concat(names, ", ")
+    end)
+    return lines
+end
+
+local function WriteAuthLog(maskedKey, attemptLines)
+    local lines = { "[Mugiwara HUB] Panda Auth failed - diagnostic log", "Key: " .. maskedKey }
+    for _, line in ipairs(DeviceInfo()) do table.insert(lines, line) end
+    for _, line in ipairs(attemptLines) do table.insert(lines, line) end
+    for _, line in ipairs(lines) do warn("[Mugiwara HUB] " .. line) end
+    if writefile then
+        pcall(function()
+            if makefolder and isfolder and not isfolder(FOLDER) then makefolder(FOLDER) end
+            writefile(AUTH_LOG_PATH, table.concat(lines, "\n"))
+        end)
+    end
+end
+
 local function ValidateKey(inputKey)
     inputKey = tostring(inputKey or ""):match("^%s*(.-)%s*$")
     if inputKey == "" or #inputKey > MAX_KEY_LENGTH then
@@ -231,20 +299,26 @@ local function ValidateKey(inputKey)
     end
 
     local result
+    local attemptLines = {}
     for attempt = 1, VALIDATE_ATTEMPTS do
+        local started = os.clock()
         local ok, response = pcall(PUSL.validate, inputKey)
+        local took = ("%.2fs"):format(os.clock() - started)
         if ok and type(response) == "table" then
             if response.success == true or response.reason == "INVALID_KEY" then
                 return response.success == true, response.isPremium == true, response
             end
             result = response
+            table.insert(attemptLines, ("Attempt %d (%s): %s"):format(attempt, took, DescribeValue(response)))
         else
             result = { reason = "NETWORK" }
+            table.insert(attemptLines, ("Attempt %d (%s): validate %s -> %s"):format(
+                attempt, took, ok and "returned" or "threw", DescribeValue(response)))
         end
         if attempt < VALIDATE_ATTEMPTS then task.wait(attempt * 2) end
     end
 
-    warn("[Mugiwara HUB] Panda Auth unavailable: " .. tostring(result.reason))
+    WriteAuthLog(MaskKey(inputKey), attemptLines)
     return false, false, {
         message = TRANSIENT_MESSAGES[result.reason] or result.message or "Auth server unavailable. Please try again.",
         reason = result.reason,
