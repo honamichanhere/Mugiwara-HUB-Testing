@@ -528,20 +528,20 @@ end
 LoadGlobalTabs()
 
 local currentPlaceId = game.PlaceId
+local currentGameId = game.GameId
 local UniversalModulePath = "Universal.lua"
 local TargetModulePath = nil
 
--- Register new games here (PlaceIds + path to the game's Init.lua).
+-- Register new games here: GameIds (universe id, sama untuk semua sub-place / jenis server game itu: Big Team,
+-- Casual, Pro, VC Only, Social Space, dll.) dan/atau PlaceIds tambahan, plus path ke Init.lua game itu.
 local SupportedGames = {
-    Evade = { PlaceIds = { 9872472334, 99214917572799, 10668472534 }, Path = "Games/Evade/Init.lua" },
+    Evade = { GameIds = { 3647333358 }, PlaceIds = { 9872472334, 99214917572799, 10668472534 }, Path = "Games/Evade/Init.lua" },
 }
 
 for _, data in pairs(SupportedGames) do
-    for _, id in ipairs(data.PlaceIds) do
-        if id == currentPlaceId then
-            TargetModulePath = data.Path
-            break
-        end
+    if table.find(data.GameIds or {}, currentGameId) or table.find(data.PlaceIds or {}, currentPlaceId) then
+        TargetModulePath = data.Path
+        break
     end
 end
 
