@@ -141,4 +141,7 @@ return function(TargetTab, isPremiumUser, MugiwaraUI)
 
     -- Referensi toggle dipakai shortcut keyboard (tab Misc) supaya tombol UI ikut berubah.
     MovementModule.UI = { Speed = ToggleSpeed, InfJump = ToggleInfJump, Fly = ToggleFly, Noclip = ToggleNoclip }
+
+    -- Section dikembalikan supaya modul game bisa menambah fitur khusus game di kategori yang sama.
+    return { Jump = JumpSection }
 end
