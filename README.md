@@ -32,7 +32,10 @@ built-in ones; loading a preset also selects its skybox in the Sky Box picker, a
 confirmation; Default and built-in presets cannot be deleted). **Share Preset** copies a code (`MWL1:...`, a few hundred characters) of the preset picked in Load Presets;
 **Load Preset via Code** applies a code from someone else and saves it to your list under a free name (never over one of
 yours). Codes carry the lighting values and the sky (texture ids); everything in a code is checked before use (types,
-slider ranges, only asset ids or Roblox's own rbxasset:// textures). The Sky Box picker is a grid with the Roblox store
+slider ranges, only asset ids or Roblox's own rbxasset:// textures). JoevanShader codes (`JOEVAN#...`) are supported too:
+**Load Preset via Code** accepts them (only the lighting keys Mugiwara has are read, the rest is ignored), and **Share as
+JoevanShader Code** copies the picked preset as a `JOEVAN#` code to paste in JoevanShader > Presets > Import Preset Code
+(`Manager/SharePreset.lua`). The Sky Box picker is a grid with the Roblox store
 thumbnail of each sky, fetched in the background (needs `request`, `writefile` and `getcustomasset`; without them the
 tiles show an icon).
 

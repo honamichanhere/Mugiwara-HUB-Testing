@@ -1,4 +1,5 @@
 local LightingModule = getgenv().MugiwaraImport("Manager/Lighting.lua")
+local SharePreset = getgenv().MugiwaraImport("Manager/SharePreset.lua")
 
 return function(Window, isPremiumUser, MugiwaraUI)
     
@@ -114,6 +115,34 @@ return function(Window, isPremiumUser, MugiwaraUI)
     })
 
     PremiumSection:Button({
+        Title = "Share as JoevanShader Code",
+        Icon = "lucide:share-2",
+        Desc = "Copy the preset selected in Load Presets as a JOEVAN# code for JoevanShader.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Callback = function()
+            local name = VipLoadPreset and VipLoadPreset:Get()
+            if type(name) ~= "string" or name == "" then
+                MugiwaraUI:Notify({ Title = "Share Preset", Content = "Pick a preset in Load Presets first.", Duration = 3 })
+                return
+            end
+            if not setclipboard then
+                MugiwaraUI:Notify({ Title = "Share Preset", Content = "Your executor does not support setclipboard.", Duration = 4 })
+                return
+            end
+            task.spawn(function()
+                local code, message = SharePreset.ExportJoevan(name)
+                if code then
+                    setclipboard(code)
+                    MugiwaraUI:Notify({ Title = "JoevanShader Code Copied!", Content = "Paste it in JoevanShader > Presets > Import Preset Code.", Duration = 4 })
+                else
+                    MugiwaraUI:Notify({ Title = "Share Preset", Content = message or "Could not make a code for this preset.", Duration = 4 })
+                end
+            end)
+        end
+    })
+
+    PremiumSection:Button({
         Title = "Delete Preset",
         Icon = "lucide:trash-2",
         Desc = "Delete the saved preset selected in Load Presets. Default and built-in presets stay.",
@@ -160,7 +189,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
         LockedTitle = "Premium Only",
         Callback = function(Text)
             if Text == "" then return end
-            local success, result, saved = LightingModule.ImportPreset(Text)
+            local success, result, saved = SharePreset.Import(Text)
             if success then
                 MugiwaraUI:Notify({
                     Title = "Preset Loaded!",
