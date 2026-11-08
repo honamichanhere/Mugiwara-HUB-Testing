@@ -362,13 +362,17 @@ RunService:BindToRenderStep("MugiwaraCameraMaster", Enum.RenderPriority.Last.Val
 
 end)
 
--- Smooth Mouse di kamera biasa. Kamera bawaan Roblox memutar dari Camera.CFrame frame sebelumnya, jadi tepat setelah
--- kamera bawaan jalan (prioritas Camera + 1) putaran yang barusan ia tambahkan (mouse, panah, touch, gamepad) dibaca,
--- disaring, lalu kamera diputar ulang mengelilingi Camera.Focus dengan jarak yang sama. Frame berikutnya kamera bawaan
--- melanjutkan dari hasil saringan ini.
+-- Smooth Mouse di kamera biasa.
+-- Kamera "sumber" (kamera bawaan Roblox, atau kamera milik game seperti Evade yang menyimpan sudutnya sendiri) dibiarkan
+-- berjalan apa adanya. Tepat sebelum frame berikutnya dimulai (prioritas First) Camera.CFrame dikembalikan ke hasil
+-- kamera sumber, jadi sumber TIDAK PERNAH melihat hasil saringan dan tidak ada umpan balik (umpan balik itulah yang
+-- membuat kamera memantul / bounce: sumber yang menyimpan sudut sendiri terus menghitung ulang selisih yang sama).
+-- Setelah sumber jalan (prioritas Last + 1), selisih sudut sumber terhadap frame sebelumnya = putaran dari input user
+-- (mouse, panah, touch, gamepad); selisih itu disaring dan kamera diputar mengelilingi Camera.Focus dengan jarak yang sama.
 local SNAP_YAW, SNAP_PITCH = math.rad(90), math.rad(60) -- lompatan sebesar ini (respawn, teleport kamera) tidak disaring
 local MAX_PITCH = math.rad(80)
-local lastYaw, lastPitch
+local sourceCFrame, sourceYaw, sourcePitch -- hasil kamera sumber frame sebelumnya
+local smoothYaw, smoothPitch               -- sudut yang ditampilkan
 
 local function LookAngles(cf)
     local look = cf.LookVector
@@ -379,43 +383,51 @@ local function WrapAngle(angle)
     return (angle + math.pi) % (2 * math.pi) - math.pi
 end
 
-RunService:BindToRenderStep("MugiwaraSmoothMouse", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
-    if not (Camera and CameraModule.SmoothMouseEnabled) or CameraModule.FreecamEnabled
-        or Camera.CameraType ~= Enum.CameraType.Custom then
-        lastYaw = nil
+local function SmoothMouseActive()
+    return Camera and CameraModule.SmoothMouseEnabled and not CameraModule.FreecamEnabled
+        and Camera.CameraType == Enum.CameraType.Custom
+end
+
+local function ResetSource()
+    sourceCFrame, sourceYaw, sourcePitch, smoothYaw, smoothPitch = nil, nil, nil, nil, nil
+    CameraModule.ResetSmoothMouse()
+end
+
+RunService:BindToRenderStep("MugiwaraSmoothMouseRestore", Enum.RenderPriority.First.Value, function()
+    if sourceCFrame and SmoothMouseActive() then Camera.CFrame = sourceCFrame end
+end)
+
+RunService:BindToRenderStep("MugiwaraSmoothMouse", Enum.RenderPriority.Last.Value + 1, function(deltaTime)
+    if not SmoothMouseActive() then
+        if sourceCFrame then ResetSource() end
         return
     end
 
     local cf, focus = Camera.CFrame, Camera.Focus.Position
     local yaw, pitch = LookAngles(cf)
-    if not lastYaw then
-        lastYaw, lastPitch = yaw, pitch
-        CameraModule.ResetSmoothMouse()
-        return
-    end
+    local turnYaw = sourceYaw and WrapAngle(yaw - sourceYaw) or 0
+    local turnPitch = sourcePitch and (pitch - sourcePitch) or 0
+    sourceCFrame, sourceYaw, sourcePitch = cf, yaw, pitch
 
-    local turnYaw, turnPitch = WrapAngle(yaw - lastYaw), pitch - lastPitch
-    if math.abs(turnYaw) > SNAP_YAW or math.abs(turnPitch) > SNAP_PITCH then
-        lastYaw, lastPitch = yaw, pitch
+    if not smoothYaw or math.abs(turnYaw) > SNAP_YAW or math.abs(turnPitch) > SNAP_PITCH then
+        smoothYaw, smoothPitch = yaw, pitch
         CameraModule.ResetSmoothMouse()
         return
     end
 
     local outYaw, outPitch = FilterLook(math.deg(turnYaw), math.deg(turnPitch), deltaTime)
-    local newYaw = lastYaw + math.rad(outYaw)
-    local newPitch = math.clamp(lastPitch + math.rad(outPitch), -MAX_PITCH, MAX_PITCH)
-    if math.abs(newPitch) >= MAX_PITCH then lookFilter.PendingPitch = 0 end
+    smoothYaw = WrapAngle(smoothYaw + math.rad(outYaw))
+    smoothPitch = math.clamp(smoothPitch + math.rad(outPitch), -MAX_PITCH, MAX_PITCH)
+    if math.abs(smoothPitch) >= MAX_PITCH then lookFilter.PendingPitch = 0 end
 
     local distance = (cf.Position - focus).Magnitude
-    local rotation = CFrame.Angles(0, newYaw, 0) * CFrame.Angles(newPitch, 0, 0)
+    local rotation = CFrame.Angles(0, smoothYaw, 0) * CFrame.Angles(smoothPitch, 0, 0)
     Camera.CFrame = CFrame.new(focus) * rotation * CFrame.new(0, 0, distance)
-    lastYaw, lastPitch = newYaw, newPitch
 end)
 
 function CameraModule.SetSmoothMouse(enabled)
     CameraModule.SmoothMouseEnabled = enabled
-    CameraModule.ResetSmoothMouse()
-    lastYaw = nil
+    ResetSource()
 end
 
 function CameraModule.SetSmoothMouseMode(mode)
@@ -428,6 +440,7 @@ end
 getgenv().MugiwaraRegisterCleanup(function()
     pcall(function() RunService:UnbindFromRenderStep("MugiwaraCameraMaster") end)
     pcall(function() RunService:UnbindFromRenderStep("MugiwaraSmoothMouse") end)
+    pcall(function() RunService:UnbindFromRenderStep("MugiwaraSmoothMouseRestore") end)
     CameraModule.SmoothMouseEnabled = false
     if fovConnection then fovConnection:Disconnect() fovConnection = nil end
     if subjectConnection then subjectConnection:Disconnect() subjectConnection = nil end
