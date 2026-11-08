@@ -23,6 +23,52 @@ local MOUSE_DEGREES_PER_PIXEL = 0.5
 local MOUSE_VERTICAL_RATIO = 0.77
 local ARROW_DEGREES_PER_SECOND = 40
 
+-- Smooth Mouse: menyaring putaran kamera (Free Camera maupun kamera biasa) supaya gerakan tangan yang tidak rata /
+-- tremor tidak sampai ke kamera.
+--   "Smooth"   : putaran mouse dikumpulkan lalu dilepas sedikit demi sedikit tiap frame (getaran kecil saling hilang).
+--   "Constant" : yang diambil hanya ARAH gerakan; kamera berputar dengan kecepatan tetap seperti tombol panah.
+--                Gerakan di bawah Deadzone diabaikan (tremor tidak memutar kamera sama sekali).
+CameraModule.SmoothMouseEnabled = false
+CameraModule.SmoothMouseMode = "Smooth"   -- "Smooth" | "Constant"
+CameraModule.SmoothMouseSmoothness = 0.5  -- 0 = hampir langsung, 1 = sangat halus (mode Smooth)
+CameraModule.SmoothMouseSpeed = 60        -- derajat per detik (mode Constant)
+CameraModule.SmoothMouseDeadzone = 20     -- derajat per detik; gerakan lebih pelan dari ini diabaikan (mode Constant)
+CameraModule.SmoothMouseModes = { "Smooth", "Constant" }
+
+local CONSTANT_RESPONSE = 0.08 -- detik; perataan kecepatan mouse supaya celah antar polling mouse tidak membuat putaran tersendat
+
+local lookFilter = { PendingYaw = 0, PendingPitch = 0, VelYaw = 0, VelPitch = 0 }
+
+function CameraModule.ResetSmoothMouse()
+    lookFilter.PendingYaw, lookFilter.PendingPitch, lookFilter.VelYaw, lookFilter.VelPitch = 0, 0, 0, 0
+end
+
+local function ConstantAxis(velocity, deltaTime)
+    if math.abs(velocity) <= CameraModule.SmoothMouseDeadzone then return 0 end
+    return (velocity > 0 and 1 or -1) * CameraModule.SmoothMouseSpeed * deltaTime
+end
+
+-- Masukan: putaran yang diminta frame ini (derajat). Keluaran: putaran yang benar-benar dipakai frame ini (derajat).
+local function FilterLook(yaw, pitch, deltaTime)
+    if not CameraModule.SmoothMouseEnabled or deltaTime <= 0 then return yaw, pitch end
+
+    if CameraModule.SmoothMouseMode == "Constant" then
+        local alpha = 1 - math.exp(-deltaTime / CONSTANT_RESPONSE)
+        lookFilter.VelYaw = lookFilter.VelYaw + (yaw / deltaTime - lookFilter.VelYaw) * alpha
+        lookFilter.VelPitch = lookFilter.VelPitch + (pitch / deltaTime - lookFilter.VelPitch) * alpha
+        return ConstantAxis(lookFilter.VelYaw, deltaTime), ConstantAxis(lookFilter.VelPitch, deltaTime)
+    end
+
+    local rate = 40 - CameraModule.SmoothMouseSmoothness * 38 -- 40/detik (cepat) .. 2/detik (sangat halus)
+    local alpha = 1 - math.exp(-rate * deltaTime)
+    lookFilter.PendingYaw = lookFilter.PendingYaw + yaw
+    lookFilter.PendingPitch = lookFilter.PendingPitch + pitch
+    local outYaw, outPitch = lookFilter.PendingYaw * alpha, lookFilter.PendingPitch * alpha
+    lookFilter.PendingYaw = lookFilter.PendingYaw - outYaw
+    lookFilter.PendingPitch = lookFilter.PendingPitch - outPitch
+    return outYaw, outPitch
+end
+
 local GameSettings
 pcall(function() GameSettings = UserSettings():GetService("UserGameSettings") end)
 
@@ -240,6 +286,8 @@ RunService:BindToRenderStep("MugiwaraCameraMaster", Enum.RenderPriority.Last.Val
         if UserInputService:IsKeyDown(Enum.KeyCode.E) then moveVector = moveVector + Vector3.new(0, 1, 0) end
         if UserInputService:IsKeyDown(Enum.KeyCode.Q) then moveVector = moveVector + Vector3.new(0, -1, 0) end
 
+        -- Putaran yang diminta frame ini (derajat), lalu disaring Smooth Mouse sebelum dipakai.
+        local turnPitch, turnYaw = 0, 0
         if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
             UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
             local mouseDelta = UserInputService:GetMouseDelta()
@@ -247,19 +295,21 @@ RunService:BindToRenderStep("MugiwaraCameraMaster", Enum.RenderPriority.Last.Val
             if CameraModule.UseRobloxSensitivity then
                 sensitivity, vertical = CameraModule.GetRobloxSensitivity(), MOUSE_VERTICAL_RATIO
             end
-            rotationX = rotationX - (mouseDelta.Y * MOUSE_DEGREES_PER_PIXEL * sensitivity * vertical * CameraModule.VerticalSpeed)
-            rotationY = rotationY - (mouseDelta.X * MOUSE_DEGREES_PER_PIXEL * sensitivity * CameraModule.HorizontalSpeed)
+            turnPitch = -(mouseDelta.Y * MOUSE_DEGREES_PER_PIXEL * sensitivity * vertical * CameraModule.VerticalSpeed)
+            turnYaw = -(mouseDelta.X * MOUSE_DEGREES_PER_PIXEL * sensitivity * CameraModule.HorizontalSpeed)
         else
             UserInputService.MouseBehavior = originalMouseBehavior
             local turn = ARROW_DEGREES_PER_SECOND * deltaTime
             local rotSpeedX, rotSpeedY = turn * CameraModule.VerticalSpeed, turn * CameraModule.HorizontalSpeed
-            if UserInputService:IsKeyDown(Enum.KeyCode.Up) then rotationX = rotationX + rotSpeedX end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Down) then rotationX = rotationX - rotSpeedX end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Left) then rotationY = rotationY + rotSpeedY end
-            if UserInputService:IsKeyDown(Enum.KeyCode.Right) then rotationY = rotationY - rotSpeedY end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Up) then turnPitch = turnPitch + rotSpeedX end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Down) then turnPitch = turnPitch - rotSpeedX end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Left) then turnYaw = turnYaw + rotSpeedY end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Right) then turnYaw = turnYaw - rotSpeedY end
         end
-
-        rotationX = math.clamp(rotationX, -89, 89)
+        turnYaw, turnPitch = FilterLook(turnYaw, turnPitch, deltaTime)
+        rotationY = rotationY + turnYaw
+        rotationX = math.clamp(rotationX + turnPitch, -89, 89)
+        if math.abs(rotationX) >= 89 then lookFilter.PendingPitch = 0 end
         local camRotation = CFrame.Angles(0, math.rad(rotationY), 0) * CFrame.Angles(math.rad(rotationX), 0, 0)
         
         if moveVector.Magnitude > 0 then
@@ -312,9 +362,73 @@ RunService:BindToRenderStep("MugiwaraCameraMaster", Enum.RenderPriority.Last.Val
 
 end)
 
+-- Smooth Mouse di kamera biasa. Kamera bawaan Roblox memutar dari Camera.CFrame frame sebelumnya, jadi tepat setelah
+-- kamera bawaan jalan (prioritas Camera + 1) putaran yang barusan ia tambahkan (mouse, panah, touch, gamepad) dibaca,
+-- disaring, lalu kamera diputar ulang mengelilingi Camera.Focus dengan jarak yang sama. Frame berikutnya kamera bawaan
+-- melanjutkan dari hasil saringan ini.
+local SNAP_YAW, SNAP_PITCH = math.rad(90), math.rad(60) -- lompatan sebesar ini (respawn, teleport kamera) tidak disaring
+local MAX_PITCH = math.rad(80)
+local lastYaw, lastPitch
+
+local function LookAngles(cf)
+    local look = cf.LookVector
+    return math.atan2(-look.X, -look.Z), math.asin(math.clamp(look.Y, -1, 1))
+end
+
+local function WrapAngle(angle)
+    return (angle + math.pi) % (2 * math.pi) - math.pi
+end
+
+RunService:BindToRenderStep("MugiwaraSmoothMouse", Enum.RenderPriority.Camera.Value + 1, function(deltaTime)
+    if not (Camera and CameraModule.SmoothMouseEnabled) or CameraModule.FreecamEnabled
+        or Camera.CameraType ~= Enum.CameraType.Custom then
+        lastYaw = nil
+        return
+    end
+
+    local cf, focus = Camera.CFrame, Camera.Focus.Position
+    local yaw, pitch = LookAngles(cf)
+    if not lastYaw then
+        lastYaw, lastPitch = yaw, pitch
+        CameraModule.ResetSmoothMouse()
+        return
+    end
+
+    local turnYaw, turnPitch = WrapAngle(yaw - lastYaw), pitch - lastPitch
+    if math.abs(turnYaw) > SNAP_YAW or math.abs(turnPitch) > SNAP_PITCH then
+        lastYaw, lastPitch = yaw, pitch
+        CameraModule.ResetSmoothMouse()
+        return
+    end
+
+    local outYaw, outPitch = FilterLook(math.deg(turnYaw), math.deg(turnPitch), deltaTime)
+    local newYaw = lastYaw + math.rad(outYaw)
+    local newPitch = math.clamp(lastPitch + math.rad(outPitch), -MAX_PITCH, MAX_PITCH)
+    if math.abs(newPitch) >= MAX_PITCH then lookFilter.PendingPitch = 0 end
+
+    local distance = (cf.Position - focus).Magnitude
+    local rotation = CFrame.Angles(0, newYaw, 0) * CFrame.Angles(newPitch, 0, 0)
+    Camera.CFrame = CFrame.new(focus) * rotation * CFrame.new(0, 0, distance)
+    lastYaw, lastPitch = newYaw, newPitch
+end)
+
+function CameraModule.SetSmoothMouse(enabled)
+    CameraModule.SmoothMouseEnabled = enabled
+    CameraModule.ResetSmoothMouse()
+    lastYaw = nil
+end
+
+function CameraModule.SetSmoothMouseMode(mode)
+    if mode ~= "Smooth" and mode ~= "Constant" then return end
+    CameraModule.SmoothMouseMode = mode
+    CameraModule.ResetSmoothMouse()
+end
+
 -- Full teardown on re-execute: undo freecam/spectate, release the character, drop all hooks.
 getgenv().MugiwaraRegisterCleanup(function()
     pcall(function() RunService:UnbindFromRenderStep("MugiwaraCameraMaster") end)
+    pcall(function() RunService:UnbindFromRenderStep("MugiwaraSmoothMouse") end)
+    CameraModule.SmoothMouseEnabled = false
     if fovConnection then fovConnection:Disconnect() fovConnection = nil end
     if subjectConnection then subjectConnection:Disconnect() subjectConnection = nil end
     if cameraChangeConnection then cameraChangeConnection:Disconnect() cameraChangeConnection = nil end

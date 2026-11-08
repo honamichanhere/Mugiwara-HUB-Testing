@@ -9,7 +9,7 @@ Roblox script hub by Honami, built on [Mugiwara UI](https://github.com/honamicha
 | Premium Access | Key activation and premium purchase info |
 | Home | Player and server info, links, credits |
 | Lighting | Presets (share them with a code), skybox picker with preview pictures, atmosphere, bloom, blur, color correction, depth of field, sun rays, volumetric clouds, hide sun |
-| Camera | Free camera, spectate, FOV and zoom lock, stabilizers |
+| Camera | Free camera, spectate, FOV and zoom lock, stabilizers, Smooth Mouse (Smooth: eases mouse turns; Constant: fixed-speed turning like the Arrow Keys, with a deadzone that ignores hand tremor) |
 | Main (per game) | Character movement (speed, jump, fly, noclip), plus game-specific modules |
 | Misc | Global utilities: Anti-AFK, Auto Rejoin, Rejoin, Server Hop, Join by Job ID, rebindable keyboard shortcuts, Hide GUI, Unload Hub |
 | Chat | Live chat with everyone running the hub (needs the chat server address in `Main.lua`) |

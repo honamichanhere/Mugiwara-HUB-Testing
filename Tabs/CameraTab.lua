@@ -166,6 +166,74 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
+    local SmoothMouseSection = PremiumSection:Section({ Title = "Smooth Mouse", Icon = "lucide:mouse-pointer-click", Opened = false })
+
+    SmoothMouseSection:Toggle({
+        Title = "Enable Smooth Mouse",
+        Icon = "lucide:mouse",
+        Desc = "Filters how the camera turns (normal camera and Free Camera), so shaky or uneven mouse movement does not reach the camera.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Value = false,
+        Callback = function(Value)
+            CameraModule.SetSmoothMouse(Value)
+        end
+    })
+
+    SmoothMouseSection:Dropdown({
+        Title = "Smooth Mouse Mode",
+        Icon = "lucide:sliders-horizontal",
+        Desc = "Smooth: eases every mouse movement out over a few frames. Constant: only the direction counts, the camera turns at a fixed speed like the Arrow Keys.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Values = CameraModule.SmoothMouseModes,
+        Value = CameraModule.SmoothMouseMode,
+        Callback = function(Option)
+            if type(Option) == "string" then CameraModule.SetSmoothMouseMode(Option) end
+        end
+    })
+
+    SmoothMouseSection:Slider({
+        Title = "Smoothness",
+        Icon = "lucide:waves",
+        Desc = "Smooth mode. Higher = softer, slower to catch up with the mouse.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Step = 0.01,
+        Value = { Min = 0, Max = 1, Default = CameraModule.SmoothMouseSmoothness },
+        Callback = function(Value)
+            CameraModule.SmoothMouseSmoothness = Value
+        end
+    })
+
+    SmoothMouseSection:Slider({
+        Title = "Constant Turn Speed",
+        Icon = "lucide:gauge",
+        Desc = "Constant mode. How fast the camera turns while the mouse moves, in degrees per second.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Step = 1,
+        Suffix = "°/s",
+        Value = { Min = 5, Max = 360, Default = CameraModule.SmoothMouseSpeed },
+        Callback = function(Value)
+            CameraModule.SmoothMouseSpeed = Value
+        end
+    })
+
+    SmoothMouseSection:Slider({
+        Title = "Constant Deadzone",
+        Icon = "lucide:circle-off",
+        Desc = "Constant mode. Mouse movement slower than this is ignored, so a shaky hand does not turn the camera. Raise it if the camera still drifts.",
+        Locked = not isPremiumUser,
+        LockedTitle = "Premium Only",
+        Step = 1,
+        Suffix = "°/s",
+        Value = { Min = 0, Max = 300, Default = CameraModule.SmoothMouseDeadzone },
+        Callback = function(Value)
+            CameraModule.SmoothMouseDeadzone = Value
+        end
+    })
+
     local FovSection = TabCamera:Section({ Title = "Field of View", Icon = "lucide:eye", Opened = false, Box = true })
 
     local ToggleFOV
