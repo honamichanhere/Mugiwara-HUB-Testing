@@ -144,24 +144,7 @@ return function(Window, isPremiumUser, MugiwaraUI)
 
     local injectMovement = getgenv().MugiwaraImport("Tabs/MovementInjector.lua")
     if injectMovement then
-        local sections = injectMovement(TabMain, isPremiumUser, MugiwaraUI)
-        local AutoJump = getgenv().MugiwaraImport("Games/Evade/AutoJump.lua")
-        if AutoJump and type(sections) == "table" and sections.Jump then
-            local ToggleAutoJump
-            ToggleAutoJump = sections.Jump:Toggle({
-                Title = "Auto Jump (Hold Space)",
-                Icon = "lucide:repeat",
-                Desc = "Hold Space to keep jumping every time you land, like normal Roblox. Evade only lets you jump once per press.",
-                Value = false,
-                Callback = function(Value)
-                    local ok, message = AutoJump.SetEnabled(Value)
-                    if not ok then
-                        MugiwaraUI:Notify({ Title = "Auto Jump", Content = message, Duration = 5 })
-                        if ToggleAutoJump then task.defer(function() pcall(function() ToggleAutoJump:Set(false) end) end) end
-                    end
-                end
-            })
-        end
+        injectMovement(TabMain, isPremiumUser, MugiwaraUI)
     end
 
     pcall(function() Window:SelectTab(2) end)
