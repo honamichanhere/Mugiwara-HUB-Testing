@@ -234,6 +234,42 @@ return function(Window, isPremiumUser, MugiwaraUI)
         end
     })
 
+    local SensitivitySection = TabCamera:Section({ Title = "Camera Sensitivity", Icon = "lucide:mouse", Opened = false, Box = true })
+
+    SensitivitySection:Toggle({
+        Title = "Enable Camera Sensitivity",
+        Icon = "lucide:mouse",
+        Desc = "Change how fast the normal camera turns (not Free Camera). Works on mouse, touch and Arrow Keys.",
+        Value = false,
+        Callback = function(Value)
+            CameraModule.SetSensitivity(Value)
+        end
+    })
+
+    SensitivitySection:Slider({
+        Title = "Mouse / Touch Sensitivity",
+        Icon = "lucide:mouse-pointer-2",
+        Desc = "Turning speed when dragging with the mouse or a finger. 1 = game default.",
+        Step = 0.05,
+        Suffix = "x",
+        Value = { Min = 0.1, Max = 5, Default = 1 },
+        Callback = function(Value)
+            CameraModule.LookSensitivity = Value
+        end
+    })
+
+    SensitivitySection:Slider({
+        Title = "Arrow Key Sensitivity",
+        Icon = "lucide:move-horizontal",
+        Desc = "Turning speed while holding the Arrow Keys (only in games where the Arrow Keys turn the camera). 1 = game default.",
+        Step = 0.05,
+        Suffix = "x",
+        Value = { Min = 0.1, Max = 5, Default = 1 },
+        Callback = function(Value)
+            CameraModule.ArrowSensitivity = Value
+        end
+    })
+
     local FovSection = TabCamera:Section({ Title = "Field of View", Icon = "lucide:eye", Opened = false, Box = true })
 
     local ToggleFOV

@@ -362,13 +362,27 @@ RunService:BindToRenderStep("MugiwaraCameraMaster", Enum.RenderPriority.Last.Val
 
 end)
 
--- Smooth Mouse di kamera biasa.
+-- Kamera biasa: Camera Sensitivity (free) dan Smooth Mouse (premium) memakai jalur yang sama.
 -- Kamera "sumber" (kamera bawaan Roblox, atau kamera milik game seperti Evade yang menyimpan sudutnya sendiri) dibiarkan
--- berjalan apa adanya. Tepat sebelum frame berikutnya dimulai (prioritas First) Camera.CFrame dikembalikan ke hasil
--- kamera sumber, jadi sumber TIDAK PERNAH melihat hasil saringan dan tidak ada umpan balik (umpan balik itulah yang
+-- berjalan apa adanya. Tepat sebelum kamera sumber jalan (prioritas Camera - 1) Camera.CFrame dikembalikan ke hasil
+-- kamera sumber, jadi sumber TIDAK PERNAH melihat hasil olahan dan tidak ada umpan balik (umpan balik itulah yang
 -- membuat kamera memantul / bounce: sumber yang menyimpan sudut sendiri terus menghitung ulang selisih yang sama).
+-- Sebelum itu (prioritas Input) Camera.CFrame masih yang ditampilkan, jadi arah jalan WASD mengikuti layar.
 -- Setelah sumber jalan (prioritas Last + 1), selisih sudut sumber terhadap frame sebelumnya = putaran dari input user
--- (mouse, panah, touch, gamepad); selisih itu disaring dan kamera diputar mengelilingi Camera.Focus dengan jarak yang sama.
+-- (mouse, panah, touch, gamepad); selisih itu dikali sensitivitas, disaring Smooth Mouse, lalu kamera diputar
+-- mengelilingi Camera.Focus dengan jarak yang sama.
+CameraModule.SensitivityEnabled = false
+CameraModule.LookSensitivity = 1  -- pengali putaran dari mouse / touch / gamepad
+CameraModule.ArrowSensitivity = 1 -- pengali putaran selama tombol panah kiri/kanan ditahan
+local ARROW_KEYS = { Enum.KeyCode.Left, Enum.KeyCode.Right, Enum.KeyCode.Up, Enum.KeyCode.Down }
+
+local function TurnMultiplier()
+    if not CameraModule.SensitivityEnabled then return 1 end
+    for _, key in ipairs(ARROW_KEYS) do
+        if UserInputService:IsKeyDown(key) then return CameraModule.ArrowSensitivity end
+    end
+    return CameraModule.LookSensitivity
+end
 local SNAP_YAW, SNAP_PITCH = math.rad(90), math.rad(60) -- lompatan sebesar ini (respawn, teleport kamera) tidak disaring
 local MAX_PITCH = math.rad(80)
 local sourceCFrame, sourceYaw, sourcePitch -- hasil kamera sumber frame sebelumnya
@@ -384,7 +398,7 @@ local function WrapAngle(angle)
 end
 
 local function SmoothMouseActive()
-    return Camera and CameraModule.SmoothMouseEnabled and not CameraModule.FreecamEnabled
+    return Camera and (CameraModule.SmoothMouseEnabled or CameraModule.SensitivityEnabled) and not CameraModule.FreecamEnabled
         and Camera.CameraType == Enum.CameraType.Custom
 end
 
@@ -393,7 +407,7 @@ local function ResetSource()
     CameraModule.ResetSmoothMouse()
 end
 
-RunService:BindToRenderStep("MugiwaraSmoothMouseRestore", Enum.RenderPriority.First.Value, function()
+RunService:BindToRenderStep("MugiwaraSmoothMouseRestore", Enum.RenderPriority.Camera.Value - 1, function()
     if sourceCFrame and SmoothMouseActive() then Camera.CFrame = sourceCFrame end
 end)
 
@@ -415,7 +429,8 @@ RunService:BindToRenderStep("MugiwaraSmoothMouse", Enum.RenderPriority.Last.Valu
         return
     end
 
-    local outYaw, outPitch = FilterLook(math.deg(turnYaw), math.deg(turnPitch), deltaTime)
+    local multiplier = TurnMultiplier()
+    local outYaw, outPitch = FilterLook(math.deg(turnYaw) * multiplier, math.deg(turnPitch) * multiplier, deltaTime)
     smoothYaw = WrapAngle(smoothYaw + math.rad(outYaw))
     smoothPitch = math.clamp(smoothPitch + math.rad(outPitch), -MAX_PITCH, MAX_PITCH)
     if math.abs(smoothPitch) >= MAX_PITCH then lookFilter.PendingPitch = 0 end
@@ -427,6 +442,11 @@ end)
 
 function CameraModule.SetSmoothMouse(enabled)
     CameraModule.SmoothMouseEnabled = enabled
+    ResetSource()
+end
+
+function CameraModule.SetSensitivity(enabled)
+    CameraModule.SensitivityEnabled = enabled
     ResetSource()
 end
 
@@ -442,6 +462,7 @@ getgenv().MugiwaraRegisterCleanup(function()
     pcall(function() RunService:UnbindFromRenderStep("MugiwaraSmoothMouse") end)
     pcall(function() RunService:UnbindFromRenderStep("MugiwaraSmoothMouseRestore") end)
     CameraModule.SmoothMouseEnabled = false
+    CameraModule.SensitivityEnabled = false
     if fovConnection then fovConnection:Disconnect() fovConnection = nil end
     if subjectConnection then subjectConnection:Disconnect() subjectConnection = nil end
     if cameraChangeConnection then cameraChangeConnection:Disconnect() cameraChangeConnection = nil end
